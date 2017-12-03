@@ -141,15 +141,11 @@
     [% PROCESS 'global/setting-descs.none.tmpl' %]
 
     [% SET css_sets = css_files(style_urls.unique, no_yui) %]
-    [% IF constants.CONCATENATE_ASSETS %]
-      [% PROCESS format_css_link asset_url = css_sets.unified_standard_skin %]
-    [% ELSE %]
-      [% FOREACH asset_url = css_sets.standard %]
-        [% PROCESS format_css_link %]
-      [% END %]
-      [% FOREACH asset_url = css_sets.skin %]
-        [% PROCESS format_css_link %]
-      [% END %]
+    [% FOREACH asset_url = css_sets.standard %]
+      [% PROCESS format_css_link %]
+    [% END %]
+    [% FOREACH asset_url = css_sets.skin %]
+      [% PROCESS format_css_link %]
     [% END %]
 
     [% IF style %]
@@ -158,14 +154,8 @@
       </style>
     [% END %]
 
-    [% IF css_sets.unified_custom %]
-      [% IF constants.CONCATENATE_ASSETS %]
-        [% PROCESS format_css_link asset_url = css_sets.unified_custom %]
-      [% ELSE %]
-        [% FOREACH asset_url = css_sets.custom %]
-          [% PROCESS format_css_link %]
-        [% END %]
-      [% END %]
+    [% FOREACH asset_url = css_sets.custom %]
+      [% PROCESS format_css_link %]
     [% END %]
 
     [%# jQuery Plugins %]
