@@ -1,0 +1,70 @@
+apiVersion: "extensions/v1beta1"
+kind: Deployment
+metadata:
+  name: bugzilla
+  labels:
+    app: bugzilla
+spec:
+  template:
+    metadata:
+      labels:
+        app: bugzilla
+    spec:
+      containers:
+        - name: httpd
+          image: bugzilla/harmony:latest
+          env:
+            - name: LOCALCONFIG_ENV
+              value: "1"
+            - name: PORT
+              value: "80"
+            - name: BMO_inbound_proxies
+              value: "*"
+            - name: BMO_urlbase
+              value: "https://bugzilla.local/"
+            - name: BMO_memcached_servers
+              value: memcached:11211
+            - name: BMO_memcached_namespace
+              value: "bugzilla:"
+            - name: BMO_db_name
+              value: bugzilla
+            - name: BMO_db_host
+              value: 127.0.0.1
+            - name: BMO_db_user
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-db-credentials
+                  key: username
+            - name: BMO_db_pass
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-db-credentials
+                  key: password
+          ports:
+            - containerPort: 80
+              name: bugzilla
+        - name: memcached
+          image: memcached:latest
+
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          command: ["/cloud_sql_proxy", "--dir=/cloudsql",
+            "-instances=bugzilla-quantum:us-central1:bugzilla=tcp:3306",
+                    "-credential_file=/secrets/cloudsql/credentials.json"]
+          volumeMounts:
+            - name: cloudsql-instance-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+            - name: cloudsql
+              mountPath: /cloudsql
+      volumes:
+        - name: cloudsql-instance-credentials
+          secret:
+            secretName: cloudsql-instance-credentials
+        - name: cloudsql
+          emptyDir:
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs

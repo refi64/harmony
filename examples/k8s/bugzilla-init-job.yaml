@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-test-data
+spec:
+  template:
+    metadata:
+      name: load-test-data
+    spec:
+      containers:
+      - name: load-test-data
+        image: bugzilla/harmony:latest
+        command: ["/app/scripts/entrypoint.pl", "load_test_data"]
+        env:
+          - name: LOCALCONFIG_ENV
+            value: "1"
+          - name: PORT
+            value: "80"
+          - name: BMO_inbound_proxies
+            value: "*"
+          - name: BMO_urlbase
+            value: "https://bugzilla.local/"
+          - name: BMO_memcached_servers
+            value: memcached:11211
+          - name: BMO_memcached_namespace
+            value: "bugzilla:"
+          - name: BMO_db_name
+            value: bugzilla
+          - name: BMO_db_host
+            value: 127.0.0.1
+          - name: BMO_db_user
+            valueFrom:
+              secretKeyRef:
+                name: cloudsql-db-credentials
+                key: username
+          - name: BMO_db_pass
+            valueFrom:
+              secretKeyRef:
+                name: cloudsql-db-credentials
+                key: password
+          - name: BZ_QA_ANSWERS_FILE
+            value: /app/.circleci/checksetup_answers.txt
+      - name: cloudsql-proxy
+        image: gcr.io/cloudsql-docker/gce-proxy:1.11
+        command: ["/cloud_sql_proxy", "--dir=/cloudsql",
+          "-instances=bugzilla-quantum:us-central1:bugzilla=tcp:3306",
+                  "-credential_file=/secrets/cloudsql/credentials.json"]
+        volumeMounts:
+          - name: cloudsql-instance-credentials
+            mountPath: /secrets/cloudsql
+            readOnly: true
+          - name: ssl-certs
+            mountPath: /etc/ssl/certs
+          - name: cloudsql
+            mountPath: /cloudsql
+      volumes:
+        - name: cloudsql-instance-credentials
+          secret:
+            secretName: cloudsql-instance-credentials
+        - name: cloudsql
+          emptyDir:
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs
+      restartPolicy: Never
