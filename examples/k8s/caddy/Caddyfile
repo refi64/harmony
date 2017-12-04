@@ -1,0 +1,13 @@
+https://bugzilla.ninja/
+
+tls dylan@hardison.net
+tls {
+    dns googlecloud
+}
+
+gzip
+log  stdout
+
+proxy / bugzilla:8080 {
+    header_upstream Host {host}
+}

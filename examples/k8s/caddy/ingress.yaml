@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: caddy-https
+  namespace: bugzilla
+  labels:
+    app: bugzilla
+spec:
+  backend:
+    serviceName: caddy-proxy
+    servicePort: 443
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: caddy-http
+  namespace: bugzilla
+  labels:
+    app: bugzilla
+spec:
+  backend:
+    serviceName: caddy-proxy
+    servicePort: 80

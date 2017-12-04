@@ -2,6 +2,7 @@ apiVersion: "extensions/v1beta1"
 kind: Deployment
 metadata:
   name: bugzilla
+  namespace: bugzilla
   labels:
     app: bugzilla
 spec:
@@ -17,11 +18,11 @@ spec:
             - name: LOCALCONFIG_ENV
               value: "1"
             - name: PORT
-              value: "80"
+              value: "8080"
             - name: BMO_inbound_proxies
               value: "*"
             - name: BMO_urlbase
-              value: "https://bugzilla.local/"
+              value: "https://bugzilla.dur.me/"
             - name: BMO_memcached_servers
               value: memcached:11211
             - name: BMO_memcached_namespace
@@ -41,7 +42,7 @@ spec:
                   name: cloudsql-db-credentials
                   key: password
           ports:
-            - containerPort: 80
+            - containerPort: 8080
               name: bugzilla
         - name: memcached
           image: memcached:latest

@@ -1,0 +1,47 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: caddy-proxy
+  namespace: bugzilla
+spec:
+  replicas: 1
+  selector:
+    app: caddy
+  template:
+    metadata:
+      name: caddy-proxy
+      namespace: bugzilla
+      labels:
+        app: caddy
+    spec:
+      containers:
+      - name: caddy-proxy
+        resources:
+          requests:
+            cpu: "10m"
+          limits:
+            cpu: "100m"
+        image: "bugzilla/caddy:latest"
+        env:
+        - name: CADDY_PATH
+          value: '/etc/caddycerts'
+        - name: GCE_PROJECT
+          value: bugzilla-quantum
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /secrets/clouddns/credentials.json
+        ports:
+        - name: ssl-proxy-http
+          containerPort: 80
+        - name: ssl-proxy-https
+          containerPort: 443
+        volumeMounts:
+        - name: caddycerts
+          mountPath: /root/.caddy/
+        - name: clouddns-instance-credentials
+          mountPath: /secrets/clouddns
+          readOnly: true
+      volumes:
+      - name: caddycerts
+      - name: clouddns-instance-credentials
+        secret:
+          secretName: clouddns-instance-credentials

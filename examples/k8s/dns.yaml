@@ -1,0 +1,37 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: bugzilla
+spec:
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      containers:
+      - name: external-dns
+        image: registry.opensource.zalan.do/teapot/external-dns:v0.4.8
+        args:
+          - --source=service
+          - --source=ingress
+          - --domain-filter=bugzilla.ninja # will make ExternalDNS see only the hosted zones matching provided domain, omit to process all available hosted zones
+          - --provider=google
+          - --google-project=bugzilla-quantum
+          - --registry=txt
+          - --txt-owner-id=dylan
+        env:
+          - name: GCE_PROJECT
+            value: bugzilla-quantum
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: /secrets/clouddns/credentials.json
+        volumeMounts:
+          - name: clouddns-instance-credentials
+            mountPath: /secrets/clouddns
+            readOnly: true
+      volumes:
+        - name: clouddns-instance-credentials
+          secret:
+            secretName: clouddns-instance-credentials
