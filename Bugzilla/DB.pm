@@ -58,9 +58,7 @@ has [qw(dsn user pass attrs)] => (
         $stash->add_symbol(
             $symbol => sub {
                 my $self = shift;
-                unshift @_, $self->dbh;
-                my $func = $self->dbh->can($method);
-                goto &$func;
+                return $self->dbh->$method(@_);
             }
         );
     }
