@@ -14,39 +14,14 @@ use warnings;
 use constant NAME => 'Push';
 
 use constant REQUIRED_MODULES => [
-    {
-        package => 'Daemon-Generic',
-        module  => 'Daemon::Generic',
-        version => '0'
-    },
-    {
-        package => 'JSON-XS',
-        module  => 'JSON::XS',
-        version => '2.0'
-    },
-    {
-        package => 'Crypt-CBC',
-        module  => 'Crypt::CBC',
-        version => '0'
-    },
-    {
-        package => 'Crypt-DES',
-        module  => 'Crypt::DES',
-        version => '0'
-    },
-    {
-        package => 'Crypt-DES_EDE3',
-        module  => 'Crypt::DES_EDE3',
-        version => '0'
-    },
+  {package => 'Daemon-Generic', module => 'Daemon::Generic', version => '0'},
+  {package => 'JSON-XS',        module => 'JSON::XS',        version => '2.0'},
+  {package => 'Crypt-CBC',      module => 'Crypt::CBC',      version => '0'},
+  {package => 'Crypt-DES',      module => 'Crypt::DES',      version => '0'},
+  {package => 'Crypt-DES_EDE3', module => 'Crypt::DES_EDE3', version => '0'},
 ];
 
-use constant OPTIONAL_MODULES => [
-    {
-        package => 'XML-Simple',
-        module  => 'XML::Simple',
-        version => '0'
-    },
-];
+use constant OPTIONAL_MODULES =>
+  [{package => 'XML-Simple', module => 'XML::Simple', version => '0'},];
 
 __PACKAGE__->NAME;

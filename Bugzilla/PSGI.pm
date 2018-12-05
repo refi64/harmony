@@ -16,26 +16,24 @@ use Bugzilla::Logging;
 our @EXPORT_OK = qw(compile_cgi);
 
 sub compile_cgi {
-    my ($script) = @_;
-    require CGI::Compile;
-    require CGI::Emulate::PSGI;
+  my ($script) = @_;
+  require CGI::Compile;
+  require CGI::Emulate::PSGI;
 
-    my $cgi = CGI::Compile->compile($script);
-    my $app = CGI::Emulate::PSGI->handler(
-        sub {
-            Bugzilla::init_page();
-            $cgi->();
-        }
-    );
-    return sub {
-        my $env = shift;
-        if ($env->{'psgix.cleanup'}) {
-            push @{ $env->{'psgix.cleanup.handler'} }, \&Bugzilla::_cleanup;
-        }
-        my $res = $app->($env);
-        Bugzilla::_cleanup() if not $env->{'psgix.cleanup'};
-        return $res;
-    };
+  my $cgi = CGI::Compile->compile($script);
+  my $app = CGI::Emulate::PSGI->handler(sub {
+    Bugzilla::init_page();
+    $cgi->();
+  });
+  return sub {
+    my $env = shift;
+    if ($env->{'psgix.cleanup'}) {
+      push @{$env->{'psgix.cleanup.handler'}}, \&Bugzilla::_cleanup;
+    }
+    my $res = $app->($env);
+    Bugzilla::_cleanup() if not $env->{'psgix.cleanup'};
+    return $res;
+  };
 }
 
 

@@ -13,58 +13,59 @@ use Mojo::Parameters;
 use Data::Dumper;
 
 while (<>) {
-    my ($cmd, @args) = split /\s+/, $_;
-    next unless $cmd;
-    if (lc($cmd) eq "\LRewriteRule") {
-        my ($regex, $target, $flags) = @args;
-        $flags //= '';
-        next if $flags =~ /E=HTTP/;
-        next if $target eq '-';
-        my $action = 'rewrite_query';
-        if ($flags =~ /R/) {
-            next;
-        }
-        my ($script, $query) = $target =~ /^([^?]+)(?:\?(.+))?$/;
-        my $name = _file_to_method($script);
-        $regex =~ s/^\^//;
-        $regex =~ s/\$$//;
-        my $regex_name = _regex_to_name($regex);
-        my $param_hash = Mojo::Parameters->new($query)->to_hash;
-        my $param_str = Data::Dumper->new([$param_hash])->Terse(1)->Indent(0)->Dump;
-        say "\$r->any('/:$regex_name' => [$regex_name => qr{$regex}])->to(";
-        say "    'CGI#$name' => $param_str";
-        say ");";
-
+  my ($cmd, @args) = split /\s+/, $_;
+  next unless $cmd;
+  if (lc($cmd) eq "\LRewriteRule") {
+    my ($regex, $target, $flags) = @args;
+    $flags //= '';
+    next if $flags =~ /E=HTTP/;
+    next if $target eq '-';
+    my $action = 'rewrite_query';
+    if ($flags =~ /R/) {
+      next;
     }
-    # elsif (lc($cmd) eq "\LRedirect") {
-    #     my ($type, $path, $url) = @args;
-    #     if ($type eq 'permanent') {
-    #         say "if (\$path =~ m{^\Q$path\E}s) {";
-    #         say "    redirect(\$c, q{$url});";
-    #         say "    return;";
-    #         say "}";
-    #     }
-    #     else {
-    #         warn "I don't understand Redirect $type\n";
-    #     }
-    # }
+    my ($script, $query) = $target =~ /^([^?]+)(?:\?(.+))?$/;
+    my $name = _file_to_method($script);
+    $regex =~ s/^\^//;
+    $regex =~ s/\$$//;
+    my $regex_name = _regex_to_name($regex);
+    my $param_hash = Mojo::Parameters->new($query)->to_hash;
+    my $param_str  = Data::Dumper->new([$param_hash])->Terse(1)->Indent(0)->Dump;
+    say "\$r->any('/:$regex_name' => [$regex_name => qr{$regex}])->to(";
+    say "    'CGI#$name' => $param_str";
+    say ");";
+
+  }
+
+  # elsif (lc($cmd) eq "\LRedirect") {
+  #     my ($type, $path, $url) = @args;
+  #     if ($type eq 'permanent') {
+  #         say "if (\$path =~ m{^\Q$path\E}s) {";
+  #         say "    redirect(\$c, q{$url});";
+  #         say "    return;";
+  #         say "}";
+  #     }
+  #     else {
+  #         warn "I don't understand Redirect $type\n";
+  #     }
+  # }
 }
 
 sub _file_to_method {
-    my ($name) = @_;
-    $name =~ s/\./_/s;
-    $name =~ s/\W+/_/gs;
-    return $name;
+  my ($name) = @_;
+  $name =~ s/\./_/s;
+  $name =~ s/\W+/_/gs;
+  return $name;
 }
 
 sub _regex_to_name {
-    my ($name) = @_;
-    $name =~ s/\./_/s;
-    $name =~ s/\W+/_/gs;
-    $name =~ s/_+/_/g;
-    $name =~ s/^_//s;
-    $name =~ s/_$//s;
-    return $name;
+  my ($name) = @_;
+  $name =~ s/\./_/s;
+  $name =~ s/\W+/_/gs;
+  $name =~ s/_+/_/g;
+  $name =~ s/^_//s;
+  $name =~ s/_$//s;
+  return $name;
 }
 
 

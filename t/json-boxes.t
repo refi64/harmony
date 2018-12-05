@@ -30,7 +30,7 @@ is "$box", $box->label;
 
 $box->encode;
 
-is encode_json([ $box ]), encode_json([ encode_json($box->value) ]);
+is encode_json([$box]), encode_json([encode_json($box->value)]);
 is "$box", q[{"foo":1}];
 
 done_testing;

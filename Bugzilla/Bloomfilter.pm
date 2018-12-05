@@ -17,45 +17,45 @@ use File::Slurper qw(write_binary read_binary read_lines);
 use File::Spec::Functions qw(catfile);
 
 sub _new_bloom_filter {
-    my ($n) = @_;
-    my $p = 0.01;
-    my $m = $n * abs(log $p) / log(2) ** 2;
-    my $k = $m / $n * log(2);
-    return Algorithm::BloomFilter->new($m, $k);
+  my ($n) = @_;
+  my $p   = 0.01;
+  my $m   = $n * abs(log $p) / log(2)**2;
+  my $k   = $m / $n * log(2);
+  return Algorithm::BloomFilter->new($m, $k);
 }
 
 sub _filename {
-    my ($name, $type) = @_;
+  my ($name, $type) = @_;
 
-    my $datadir = bz_locations->{datadir};
+  my $datadir = bz_locations->{datadir};
 
-    return catfile($datadir, "$name.$type");
+  return catfile($datadir, "$name.$type");
 }
 
 sub populate {
-    my ($class, $name) = @_;
-    my $memcached = Bugzilla->memcached;
-    my @items     = read_lines(_filename($name, 'list'));
-    my $filter    = _new_bloom_filter(@items + 0);
+  my ($class, $name) = @_;
+  my $memcached = Bugzilla->memcached;
+  my @items     = read_lines(_filename($name, 'list'));
+  my $filter    = _new_bloom_filter(@items + 0);
 
-    $filter->add($_) foreach @items;
-    write_binary(_filename($name, 'bloom'), $filter->serialize);
-    $memcached->clear_bloomfilter({name => $name});
+  $filter->add($_) foreach @items;
+  write_binary(_filename($name, 'bloom'), $filter->serialize);
+  $memcached->clear_bloomfilter({name => $name});
 }
 
 sub lookup {
-    my ($class, $name) = @_;
-    my $memcached   = Bugzilla->memcached;
-    my $filename    = _filename($name, 'bloom');
-    my $filter_data = $memcached->get_bloomfilter( { name => $name } );
+  my ($class, $name) = @_;
+  my $memcached   = Bugzilla->memcached;
+  my $filename    = _filename($name, 'bloom');
+  my $filter_data = $memcached->get_bloomfilter({name => $name});
 
-    if (!$filter_data && -f $filename) {
-        $filter_data = read_binary($filename);
-        $memcached->set_bloomfilter({ name => $name, filter => $filter_data });
-    }
+  if (!$filter_data && -f $filename) {
+    $filter_data = read_binary($filename);
+    $memcached->set_bloomfilter({name => $name, filter => $filter_data});
+  }
 
-    return Algorithm::BloomFilter->deserialize($filter_data) if $filter_data;
-    return undef;
+  return Algorithm::BloomFilter->deserialize($filter_data) if $filter_data;
+  return undef;
 }
 
 1;

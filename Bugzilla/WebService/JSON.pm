@@ -39,7 +39,7 @@ sub decode {
   }
 }
 
-sub _build_json  { JSON::MaybeXS->new }
+sub _build_json { JSON::MaybeXS->new }
 
 # delegation all the json options to the real json encoder.
 {
