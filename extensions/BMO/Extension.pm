@@ -46,7 +46,6 @@ use Bugzilla::User;
 use Bugzilla::UserAgent qw(detect_platform detect_op_sys);
 use Bugzilla::User::Setting;
 use Bugzilla::Util;
-use Bugzilla::PSGI qw(compile_cgi);
 
 use Date::Parse;
 use DateTime;

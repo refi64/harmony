@@ -191,7 +191,7 @@ YAHOO.bugzilla.instantSearch = {
     var result = [];
     var name = Dom.get('product').value;
     result.push(name);
-    if (typeof products !== 'undefined' && products[name] && products[name].related) {
+    if (products[name] && products[name].related) {
       for (var i = 0, n = products[name].related.length; i < n; i++) {
         result.push(products[name].related[i]);
       }

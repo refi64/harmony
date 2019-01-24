@@ -420,7 +420,6 @@ META.json: Makefile.PL
 \tmake distmeta 2>&1 /dev/null; mv */META.json .
 
 META.yml: Makefile.PL
-1:	hit EOF seeking end of quote/pattern starting at line 1 ending in /
 \tmake distmeta 2>&1 /dev/null; mv */META.yml .
 MAKE
 }

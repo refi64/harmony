@@ -15,7 +15,6 @@ use base qw(Bugzilla::Extension);
 
 use Bugzilla::Extension::BzAPI::Constants;
 use Bugzilla::Extension::BzAPI::Util qw(fix_credentials filter_wants_nocache);
-use Bugzilla::PSGI qw(compile_cgi);
 
 use Bugzilla::Error;
 use Bugzilla::Util qw(trick_taint datetime_from);
@@ -186,7 +185,6 @@ sub webservice_status_code_map {
   my $status_code_map = $args->{status_code_map};
   $status_code_map->{51} = STATUS_BAD_REQUEST;
 }
-
 
 #####################
 # Utility Functions #

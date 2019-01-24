@@ -1242,13 +1242,6 @@ sub update_see_also {
       # We still want a changes entry, for API consistency.
       $changes{$bug->id}->{see_also} = {added => [], removed => []};
     }
-    else {
-      # We still want a changes entry, for API consistency.
-      $changes{$bug->id}->{see_also} = {added => [], removed => []};
-    }
-
-    Bugzilla::BugMail::Send($bug->id, {changer => $user});
-  }
 
     Bugzilla::BugMail::Send($bug->id, {changer => $user});
   }

@@ -1832,14 +1832,6 @@ sub _custom_search {
       ThrowCodeError('search_cp_without_op', {id => $id}) if !$current_clause;
       next;
     }
-    if ($field eq 'CP') {
-      $current_clause = pop @clause_stack;
-      ThrowCodeError('search_cp_without_op', {id => $id}) if !$current_clause;
-      next;
-    }
-
-    my $operator = $params->{"o$id"};
-    my $value    = $params->{"v$id"};
 
     my $operator = $params->{"o$id"};
     my $value    = $params->{"v$id"};

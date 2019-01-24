@@ -8,6 +8,7 @@ package Bugzilla::Elastic::Role::HasClient;
 
 use 5.10.1;
 use Moo::Role;
+use Search::Elasticsearch;
 
 
 has 'client' => (is => 'lazy');

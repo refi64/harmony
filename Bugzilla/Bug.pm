@@ -3094,28 +3094,6 @@ sub _set_product {
         $self->remove_group($group);
       }
     }
-    else {
-      $self->set_target_milestone($tm_name);
-    }
-  }
-
-  if ($product_changed) {
-
-    # Remove groups that can't be set in the new product.
-    # We copy this array because the original array is modified while we're
-    # working, and that confuses "foreach".
-    my @current_groups = @{$self->groups_in};
-    foreach my $group (@current_groups) {
-      if (!$product->group_is_valid($group)) {
-        $self->remove_group($group);
-      }
-    }
-
-    # Make sure the bug is in all the mandatory groups for the new product.
-    foreach my $group (@{$product->groups_mandatory}) {
-      $self->add_group($group);
-    }
-  }
 
     # Make sure the bug is in all the mandatory groups for the new product.
     foreach my $group (@{$product->groups_mandatory}) {

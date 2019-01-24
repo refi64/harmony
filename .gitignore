@@ -16,9 +16,7 @@
 /data
 /localconfig
 /localconfig.*
-/conf/env.conf
 /index.html
-/errors/
 /error_reports
 /.DS_Store
 /template_cache

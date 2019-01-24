@@ -37,8 +37,6 @@ use Bugzilla::Field;
 use Bugzilla::Status;
 use Bugzilla::UserAgent;
 
-use List::Util qw(any);
-
 my $user = Bugzilla->login(LOGIN_REQUIRED);
 
 my $cloned_bug;

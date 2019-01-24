@@ -1856,51 +1856,6 @@ sub _convert_groups_system_from_groupset {
         while (my ($n) = $sth2->fetchrow_array) {
           push @logadd, $n;
         }
-        my $ladd = "";
-        my $lrem = "";
-        $ladd = join(", ", @logadd) . '?' if @logadd;
-        $lrem = join(", ", @logrem) . '?' if @logrem;
-
-        # Replace profiles_activity record for groupset change
-        # with group list.
-        $dbh->do("UPDATE profiles_activity "
-            . "SET fieldid = $bgfid, newvalue = "
-            . $dbh->quote($ladd)
-            . ", oldvalue = "
-            . $dbh->quote($lrem)
-            . " WHERE userid = $uid AND profiles_when = "
-            . $dbh->quote($uwhen)
-            . " AND who = $uwho AND fieldid = $gsid");
-      }
-    }
-
-    # Identify admin group.
-    my ($admin_gid)
-      = $dbh->selectrow_array("SELECT id FROM groups WHERE name = 'admin'");
-    if (!$admin_gid) {
-      $dbh->do(
-        q{INSERT INTO groups (name, description)
-                                   VALUES ('admin', 'Administrators')}
-      );
-      $admin_gid = $dbh->bz_last_key('groups', 'id');
-    }
-
-    # Find current admins
-    my @admins;
-
-    # Don't lose admins from DBs where Bug 157704 applies
-    $sth
-      = $dbh->prepare("SELECT userid, (groupset & 65536), login_name "
-        . "FROM profiles "
-        . "WHERE (groupset | 65536) = 9223372036854775807");
-    $sth->execute();
-    while (my ($userid, $iscomplete, $login_name) = $sth->fetchrow_array()) {
-
-      # existing administrators are made members of group "admin"
-      print "\nWARNING - $login_name IS AN ADMIN IN SPITE OF BUG", " 157704\n\n"
-        if (!$iscomplete);
-      push(@admins, $userid) unless grep($_ eq $userid, @admins);
-    }
 
         # Get names of groups removed.
         $sth2 = $dbh->prepare(

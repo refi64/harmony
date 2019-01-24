@@ -13,7 +13,7 @@ use warnings;
 
 use Bugzilla::Logging;
 
-our $VERSION = '20190123.1';
+our $VERSION = '20190123.3';
 
 use Bugzilla::Auth;
 use Bugzilla::Auth::Persist::Cookie;
@@ -44,7 +44,6 @@ use File::Basename;
 use File::Spec::Functions;
 use Safe;
 use JSON::XS qw(decode_json);
-use URI;
 use Scope::Guard;
 
 use parent qw(Bugzilla::CPAN);

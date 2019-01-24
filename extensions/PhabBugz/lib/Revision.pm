@@ -73,7 +73,6 @@ has reviewers_extra_raw => (
     Dict [reviewerPHID => Str, voidedPHID => Maybe [Str], diffPHID => Maybe [Str]]
   ]
 );
-has projects_raw => (is => 'ro', isa => Dict [projectPHIDs => ArrayRef [Str]]);
 
 sub new_from_query {
   my ($class, $params) = @_;

@@ -727,8 +727,6 @@ sub _bz_locations {
   };
 }
 
-use constant BZ_PERSISTENT => $main::BUGZILLA_PERSISTENT;
-
 # This makes us not re-compute all the bz_locations data every time it's
 # called.
 BEGIN { memoize('_bz_locations') }

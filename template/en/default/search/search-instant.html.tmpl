@@ -11,7 +11,8 @@
 [% PROCESS global/header.html.tmpl
   title = "Instant Search"
   generate_api_token = 1
-  javascript_urls = javascript_urls
+  javascript_urls = [ 'extensions/GuidedBugEntry/web/js/products.js',
+                      'js/instant-search.js', ]
 %]
 
 [% UNLESS default.exists('product') && default.product.size %]
