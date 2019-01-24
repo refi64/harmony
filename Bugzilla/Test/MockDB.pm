@@ -12,10 +12,11 @@ use Try::Tiny;
 use Capture::Tiny qw(capture_merged);
 
 use Bugzilla::Test::MockLocalconfig (db_driver => 'sqlite',
-  db_name => ':memory:',);
+  db_name => $ENV{test_db_name} // ':memory:',);
 use Bugzilla;
 BEGIN { Bugzilla->extensions }
 use Bugzilla::Test::MockParams (emailsuffix => '', emailregexp => '.+',);
+use Bugzilla::Test::Util qw(create_user);
 
 sub import {
   require Bugzilla::Install;
@@ -121,6 +122,151 @@ sub import {
         );
       }
     }
+
+    create_user('nobody@mozilla.org', '*');
+    my @classifications = (
+      {
+        name        => "Client Software",
+        description => "End User Products developed by mozilla.org contributors"
+      },
+      {
+        name        => "Components",
+        description => "Standalone components that can be used by other products. "
+          . "Core, Directory, NSPR, NSS and Toolkit are used by Gecko "
+          . "(which is in turn used by Firefox, Thunderbird, SeaMonkey, "
+          . "Fennec, and others)",
+      },
+      {
+        name        => "Server Software",
+        description => "Web Server software developed by mozilla.org contributors "
+          . "to aid the development of mozilla.org products"
+      },
+      {
+        name => "Other",
+        description =>
+          "Everything else - websites, Labs, important things which aren't code"
+      },
+      {name => "Graveyard", description => "Old, retired products"},
+    );
+
+    for my $class (@classifications) {
+      my $new_class = Bugzilla::Classification->new({name => $class->{name}});
+      if (!$new_class) {
+        $dbh->do('INSERT INTO classifications (name, description) VALUES (?, ?)',
+          undef, ($class->{name}, $class->{description}));
+      }
+    }
+
+    my @products = (
+      {
+        classification => 'Client Software',
+        product_name   => 'Firefox',
+        description    => 'For bugs in Firefox Desktop, the Mozilla Foundations '
+          . 'web browser. For Firefox user interface issues in '
+          . 'menus, developer tools, bookmarks, location bar, and '
+          . 'preferences. Many Firefox bugs will either be filed '
+          . 'here or in the <a href="https://bugzilla.mozilla.org/describecomponents.cgi?product=Core">Core</a> product.'
+          . '(<a href="https://wiki.mozilla.org/Modules/All#Firefox">more info</a>)',
+        versions =>
+          ['34 Branch', '35 Branch', '36 Branch', '37 Branch', 'Trunk', 'unspecified'],
+        milestones =>
+          ['Firefox 36', '---', 'Firefox 37', 'Firefox 38', 'Firefox 39', 'Future'],
+        defaultmilestone => '---',
+        components       => [{
+          name        => 'General',
+          description => 'For bugs in Firefox which do not fit into '
+            . 'other more specific Firefox components',
+          initialowner   => 'nobody@mozilla.org',
+          initialqaowner => '',
+          initial_cc     => [],
+          watch_user     => 'general@firefox.bugs'
+        }],
+      },
+      {
+        classification => 'Other',
+        product_name   => 'bugzilla.mozilla.org',
+        description    => 'For issues relating to the bugzilla.mozilla.org website, '
+          . 'also known as <a href="https://wiki.mozilla.org/BMO">BMO</a>.',
+        versions         => ['Development/Staging', 'Production'],
+        milestones       => ['---'],
+        defaultmilestone => '---',
+        components       => [{
+          name => 'General',
+          description =>
+            'This is the component for issues specific to bugzilla.mozilla.org '
+            . 'that do not belong in other components.',
+          initialowner   => 'nobody@mozilla.org',
+          initialqaowner => '',
+          initial_cc     => [],
+          watch_user     => 'general@bugzilla.bugs'
+        }],
+      },
+    );
+
+    my $default_op_sys_id
+      = $dbh->selectrow_array("SELECT id FROM op_sys WHERE value = 'Unspecified'");
+    my $default_platform_id = $dbh->selectrow_array(
+      "SELECT id FROM rep_platform WHERE value = 'Unspecified'");
+
+    for my $product (@products) {
+      my $new_product = Bugzilla::Product->new({name => $product->{product_name}});
+      if (!$new_product) {
+        my $class_id = 1;
+        if ($product->{classification}) {
+          $class_id
+            = Bugzilla::Classification->new({name => $product->{classification}})->id;
+        }
+        $dbh->do(
+          'INSERT INTO products (name, description, classification_id,
+                                        default_op_sys_id, default_platform_id)
+                  VALUES (?, ?, ?, ?, ?)',
+          undef,
+          (
+            $product->{product_name}, $product->{description}, $class_id,
+            $default_op_sys_id,       $default_platform_id
+          )
+        );
+
+        $new_product = new Bugzilla::Product({name => $product->{product_name}});
+
+        $dbh->do('INSERT INTO milestones (product_id, value) VALUES (?, ?)',
+          undef, ($new_product->id, $product->{defaultmilestone}));
+
+        # Now clear the internal list of accessible products.
+        delete Bugzilla->user->{selectable_products};
+
+        foreach my $component (@{$product->{components}}) {
+          if (!Bugzilla::User->new({name => $component->{watch_user}})) {
+            Bugzilla::User->create({
+              login_name => $component->{watch_user}, cryptpassword => '*',
+            });
+          }
+          Bugzilla->input_params({watch_user => $component->{watch_user}});
+          Bugzilla::Component->create({
+            name             => $component->{name},
+            product          => $new_product,
+            description      => $component->{description},
+            initialowner     => $component->{initialowner},
+            initialqacontact => $component->{initialqacontact} || '',
+            initial_cc       => $component->{initial_cc} || [],
+          });
+        }
+      }
+
+      foreach my $version (@{$product->{versions}}) {
+        if (!new Bugzilla::Version({name => $version, product => $new_product})) {
+          Bugzilla::Version->create({value => $version, product => $new_product});
+        }
+      }
+
+      foreach my $milestone (@{$product->{milestones}}) {
+        if (!new Bugzilla::Milestone({name => $milestone, product => $new_product})) {
+          $dbh->do('INSERT INTO milestones (product_id, value) VALUES (?,?)',
+            undef, $new_product->id, $milestone);
+        }
+      }
+    }
+
   };
 }
 

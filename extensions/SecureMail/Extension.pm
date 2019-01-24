@@ -104,10 +104,7 @@ sub object_columns {
   my $columns = $args->{'columns'};
 
   if ($class->isa('Bugzilla::Group')) {
-    my $dbh = Bugzilla->dbh;
-    if ($dbh->bz_column_info($class->DB_TABLE, 'secure_mail')) {
-      push @$columns, 'secure_mail';
-    }
+    push(@$columns, 'secure_mail');
   }
 }
 

@@ -58,8 +58,8 @@ use List::Util qw(first);
 use Scalar::Util qw(blessed);
 use Sys::Syslog qw(:DEFAULT);
 use Text::Balanced qw( extract_bracketed extract_multiple );
-use File::Slurp qw(read_file);
-use JSON::XS;
+use JSON::MaybeXS;
+use Mojo::File qw(path);
 
 use Bugzilla::Extension::BMO::Constants;
 use Bugzilla::Extension::BMO::FakeBug;
@@ -936,8 +936,7 @@ sub object_end_of_create {
     # Add default searches to new user's footer
     my $dbh = Bugzilla->dbh;
 
-    my $sharer = Bugzilla::User->new({name => Bugzilla->params->{'nobody_user'}})
-      or return;
+    my $sharer = Bugzilla::User->new({name => 'nobody@mozilla.org'}) or return;
     my $group = Bugzilla::Group->new({name => 'everyone'}) or return;
 
     foreach my $definition (@default_named_queries) {
@@ -977,7 +976,7 @@ sub _bug_reporters_hw_os {
 sub _bug_is_unassigned {
   my ($self) = @_;
   my $assignee = $self->assigned_to->login;
-  return $assignee eq Bugzilla->params->{'nobody_user'} || $assignee =~ /\.bugs$/;
+  return $assignee eq 'nobody@mozilla.org' || $assignee =~ /\.bugs$/;
 }
 
 sub _bug_has_current_patch {
@@ -1158,7 +1157,7 @@ sub object_start_of_update {
 
   # and the assignee isn't a real person
   return
-    unless $new_bug->assigned_to->login eq Bugzilla->params->{'nobody_user'}
+    unless $new_bug->assigned_to->login eq 'nobody@mozilla.org'
     || $new_bug->assigned_to->login =~ /\.bugs$/;
 
   # and the user can set the status to NEW
@@ -1368,50 +1367,6 @@ sub db_schema_abstract_schema {
     ],
     INDEXES => [job_last_run_name_idx => {FIELDS => ['name'], TYPE => 'UNIQUE',},],
   };
-  $args->{schema}->{secbugs_BugHistory} = {
-    FIELDS => [
-      bugid      => {TYPE => 'BIGINT', NOTNULL => 1},
-      changetime => {TYPE => 'NATIVE_DATETIME'},
-      fieldname  => {TYPE => 'VARCHAR(32)', NOTNULL => 1},
-      new        => {TYPE => 'VARCHAR(255)'},
-      old        => {TYPE => 'VARCHAR(255)'},
-    ],
-  };
-
-  $args->{schema}->{secbugs_Bugs} = {
-    FIELDS => [
-      bugid     => {TYPE => 'BIGINT', NOTNULL => 1, PRIMARYKEY => 1},
-      opendate  => {TYPE => 'NATIVE_DATETIME'},
-      closedate => {TYPE => 'NATIVE_DATETIME', NOTNULL => 1},
-      severity  => {TYPE => 'VARCHAR(16)'},
-      summary   => {TYPE => 'VARCHAR(255)'},
-      updated   => {TYPE => 'NATIVE_DATETIME'},
-    ],
-  };
-
-  $args->{schema}->{secbugs_Details} = {
-    FIELDS => [
-      did          => {TYPE => 'INTSERIAL', NOTNULL => 1, PRIMARYKEY => 1,},
-      sid          => {TYPE => 'INT4',},
-      product      => {TYPE => 'VARCHAR(255)',},
-      component    => {TYPE => 'VARCHAR(255)',},
-      count        => {TYPE => 'INT4'},
-      bug_list     => {TYPE => 'TEXT'},
-      date         => {TYPE => 'NATIVE_DATETIME'},
-      avg_age_days => {TYPE => 'INT4'},
-      med_age_days => {TYPE => 'INT4'},
-    ]
-  };
-
-  $args->{schema}->{secbugs_Stats} = {
-    FIELDS => [
-      sid      => {TYPE => 'INTSERIAL', NOTNULL => 1, PRIMARYKEY => 1},
-      category => {TYPE => 'VARCHAR(32)'},
-      count    => {TYPE => 'INT4'},
-      date     => {TYPE => 'NATIVE_DATETIME'},
-    ]
-  };
-
 }
 
 sub install_update_db {
@@ -1513,7 +1468,6 @@ sub install_update_db {
         "L20n"                          => 'l20n-security',
         "Legal"                         => 'legal',
         "Marketing"                     => 'marketing-private',
-        "Marketplace"                   => 'client-services-security',
         "Mozilla Communities"           => 'mozilla-communities-security',
         "Mozilla Corporation"           => 'mozilla-employee-confidential',
         "Mozilla Developer Network"     => 'websites-security',
@@ -1549,18 +1503,17 @@ sub install_update_db {
       );
 
       # 1. Set all to core-security by default
-      my $core_sec_group
-        = Bugzilla::Group->new({name => Bugzilla->params->{insidergroup}});
+      my $core_sec_group = Bugzilla::Group->new({name => 'core-security'});
       $dbh->do("UPDATE products SET security_group_id = ?",
         undef, $core_sec_group->id);
 
       # 2. Update the ones that have explicit security groups
       foreach my $prod_name (keys %product_sec_groups) {
         my $group_name = $product_sec_groups{$prod_name};
-        next if $group_name eq Bugzilla->params->{insidergroup};    # already done
+        next if $group_name eq 'core-security';    # already done
         my $group = Bugzilla::Group->new({name => $group_name, cache => 1});
         if (!$group) {
-          warn "Security group $group_name not found. Using insider group instead.\n";
+          warn "Security group $group_name not found. Using core-security instead.\n";
           next;
         }
         $dbh->do("UPDATE products SET security_group_id = ? WHERE name = ?",
@@ -1619,8 +1572,7 @@ sub field_end_of_create {
   my $name = $field->name;
 
   if (Bugzilla->usage_mode == USAGE_MODE_CMDLINE) {
-    Bugzilla->set_user(Bugzilla::User->check(
-      {name => Bugzilla->params->{'nobody_user'}}));
+    Bugzilla->set_user(Bugzilla::User->check({name => 'nobody@mozilla.org'}));
     print "Creating IT permission grant bug for new field '$name'...";
   }
 
@@ -1690,31 +1642,6 @@ sub webservice {
 
   my $dispatch = $args->{dispatch};
   $dispatch->{BMO} = "Bugzilla::Extension::BMO::WebService";
-}
-
-sub psgi_builder {
-  my ($self, $args) = @_;
-  my $mount = $args->{mount};
-
-  my $ses_index = Plack::Builder::builder(sub {
-    my $auth_user = Bugzilla->localconfig->{ses_username};
-    my $auth_pass = Bugzilla->localconfig->{ses_password};
-    Plack::Builder::enable(
-      "Auth::Basic",
-      authenticator => sub {
-        my ($username, $password, $env) = @_;
-        return ($auth_user
-            && $auth_pass
-            && $username
-            && $password
-            && $username eq $auth_user
-            && $password eq $auth_pass);
-      }
-    );
-    compile_cgi("ses/index.cgi");
-  });
-
-  $mount->{'ses/index.cgi'} = $ses_index;
 }
 
 our $search_content_matches;
@@ -1864,20 +1791,18 @@ sub _inject_headers_into_body {
 
         # these aren't real fields, but exist in the headers
         push @fields, ('Comment Created', 'Attachment Created');
-        @fields = sort { length($b) <=> length($a) } @fields;
-        while ($value ne '') {
-          foreach my $field (@fields) {
-            if ($value eq $field) {
-              push @headers, "$name: $field";
-              $value = '';
-              last;
-            }
-            if (substr($value, 0, length($field) + 1) eq $field . ' ') {
-              push @headers, "$name: $field";
-              $value = substr($value, length($field) + 1);
-              last;
-            }
-          }
+
+        # The fields should be in longest to shortest order
+        my @sorted_fields = sort { length($b) <=> length($a) } @fields;
+
+        # A field matches if it ends with a space or the end-of-string.
+        my @regexp_fields = map { '(' . quotemeta($_) . ')(?:\s|$)' } @sorted_fields;
+        my $fields_regexp = join('|', @regexp_fields);
+
+        # //g matches all patterns and the grep ensures we only get matches.
+        my @extracted_fields = grep { defined($_) } $value =~ /$fields_regexp/g;
+        foreach my $field (@extracted_fields) {
+          push @headers, "$name: $field";
         }
       }
       else {
@@ -1919,6 +1844,7 @@ sub _inject_headers_into_body {
   }
   elsif (!$email->content_type || $email->content_type =~ /^text\/(?:html|plain)/)
   {
+
     # text-only email
     _replace_placeholder_in_part($email, $replacement);
   }
@@ -1981,9 +1907,6 @@ sub post_bug_after_creation {
   elsif ($format eq 'mozpr') {
     $self->_post_mozpr_bug($args);
   }
-  elsif ($format eq 'dev-engagement-event') {
-    $self->_post_dev_engagement($args);
-  }
   elsif ($format eq 'shield-studies') {
     $self->_post_shield_studies($args);
   }
@@ -2003,8 +1926,7 @@ sub _post_employee_incident_bug {
   my ($investigate_bug, $ssh_key_bug);
   my $old_user = Bugzilla->user;
   eval {
-    Bugzilla->set_user(Bugzilla::User->new(
-      {name => Bugzilla->params->{'nobody_user'}}));
+    Bugzilla->set_user(Bugzilla::User->new({name => 'nobody@mozilla.org'}));
     my $new_user = Bugzilla->user;
 
     # HACK: User needs to be in the editbugs and primary bug's group to allow
@@ -2166,87 +2088,6 @@ sub _post_mozpr_bug {
     );
   }
   $bug->update($bug->creation_ts);
-}
-
-sub _post_dev_engagement {
-  my ($self, $args) = @_;
-  my $vars       = $args->{vars};
-  my $parent_bug = $vars->{bug};
-  my $template   = Bugzilla->template;
-  my $cgi        = Bugzilla->cgi;
-  my $params     = Bugzilla->input_params;
-  my $old_user   = Bugzilla->user;
-
-  my $error_mode_cache = Bugzilla->error_mode;
-  Bugzilla->error_mode(ERROR_MODE_DIE);
-
-  eval {
-    # Add attachment containing tab delimited field values for
-    # spreadsheet import.
-    my @columns = qw(event start_date end_date location attendees
-      audience desc mozilla_attending_list);
-    my @attach_values;
-    foreach my $column (@columns) {
-      my $value = $params->{$column} || "";
-      $value =~ s/"/""/g;
-      push(@attach_values, qq{"$value"});
-    }
-
-    my @requested;
-    foreach my $param (grep(/^request_/, keys %$params)) {
-      next if !$params->{$param} || $param eq 'request_other_text';
-      $param =~ s/^request_//;
-      push(@requested, ucfirst($param));
-    }
-    push(@attach_values, '"' . join(",", @requested) . '"');
-
-    # we wrap the data inside a textarea to allow for the delimited data to
-    # be pasted directly into google docs.
-
-    my $values = html_quote(join("\t", @attach_values));
-    my $data = <<EOF;
-<!doctype html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>Spreadsheet Data</title>
-        <style>
-            * {
-                box-sizing: border-box;
-                height: 100%;
-                margin: 0;
-                padding: 0;
-                width: 100%;
-            }
-            body {
-                overflow: hidden;
-            }
-            textarea {
-                background: none;
-                border: 0;
-                padding: 1em;
-                resize: none;
-            }
-        </style>
-    </head>
-    <body>
-        <textarea>$values</textarea>
-    </body>
-</html>
-EOF
-
-    $self->_add_attachment(
-      $args,
-      {
-        data        => $data,
-        description => 'Spreadsheet Data',
-        filename    => 'dev_engagement_submission.html',
-        mimetype    => 'text/html',
-      }
-    );
-  };
-
-  $parent_bug->update($parent_bug->creation_ts);
 }
 
 sub _post_shield_studies {
@@ -2675,10 +2516,9 @@ sub install_filesystem {
   # version.json needs to have a source attribute pointing to
   # our repository. We already have this information in the (static)
   # contribute.json file, so parse that in
-  my $json       = JSON::XS->new->pretty->utf8->canonical();
+  my $json       = JSON::MaybeXS->new->pretty->utf8->canonical();
   my $contribute = eval {
-    $json->decode(
-      scalar read_file(bz_locations()->{cgi_path} . "/contribute.json"));
+    $json->decode(path(bz_locations()->{cgi_path}, "/contribute.json")->slurp);
   };
 
   if (!$contribute) {
@@ -2817,21 +2657,18 @@ sub app_startup {
   $r->any('/:REWRITE_mozlist' => [REWRITE_mozlist => qr{form[\.:]mozlist}])
     ->to(
     'CGI#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'mozlist'});
-  $r->any('/:REWRITE_poweredby' => [REWRITE_poweredby => qr{form[\.:]poweredby}])
-    ->to(
-    'CGI#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'poweredby'});
   $r->any(
     '/:REWRITE_presentation' => [REWRITE_presentation => qr{form[\.:]presentation}])
     ->to(
-    'cgi#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'presentation'}
+    'CGI#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'presentation'}
     );
   $r->any('/:REWRITE_trademark' => [REWRITE_trademark => qr{form[\.:]trademark}])
     ->to(
-    'cgi#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'trademark'});
+    'CGI#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'trademark'});
   $r->any(
     '/:REWRITE_recoverykey' => [REWRITE_recoverykey => qr{form[\.:]recoverykey}])
     ->to(
-    'cgi#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'recoverykey'});
+    'CGI#enter_bug_cgi' => {'product' => 'mozilla.org', 'format' => 'recoverykey'});
   $r->any('/:REWRITE_legal' => [REWRITE_legal => qr{form[\.:]legal}])
     ->to('CGI#enter_bug_cgi' => {'product' => 'Legal', 'format' => 'legal'},);
   $r->any(
@@ -2886,7 +2723,7 @@ sub app_startup {
     ->to('CGI#enter_bug_cgi' =>
       {'format' => 'mdn', 'product' => 'developer.mozilla.org'});
   $r->any(
-    '/:REWRITE_swag_gear' => [REWRITE_swag_gear => qr{form[\.:](swag|gear)}])
+    '/:REWRITE_swag_gear' => [REWRITE_swag_gear => qr{form[\.:](?:swag|gear)}])
     ->to('CGI#enter_bug_cgi' => {'format' => 'swag', 'product' => 'Marketing'});
   $r->any('/:REWRITE_costume' => [REWRITE_costume => qr{form[\.:]costume}])
     ->to(
@@ -2901,13 +2738,6 @@ sub app_startup {
       [REWRITE_user_engagement => qr{form[\.:]user[\.\-:]engagement}])
     ->to('CGI#enter_bug_cgi' =>
       {'format' => 'user-engagement', 'product' => 'Marketing'});
-  $r->any(
-    '/:REWRITE_dev_engagement_event' => [
-      REWRITE_dev_engagement_event => qr{form[\.:]dev[\.\-:]engagement[\.\-\:]event}
-    ]
-    )
-    ->to('CGI#enter_bug_cgi' =>
-      {'product' => 'Developer Engagement', 'format' => 'dev-engagement-event'});
   $r->any('/:REWRITE_mobile_compat' =>
       [REWRITE_mobile_compat => qr{form[\.:]mobile[\.\-:]compat}])
     ->to('CGI#enter_bug_cgi' =>
@@ -2941,7 +2771,7 @@ sub app_startup {
   $r->any('/:REWRITE_triage_request' =>
       [REWRITE_triage_request => qr{form[\.:]triage[\.\-]request}])
     ->to('CGI#page_cgi' => {'id' => 'triage_request.html'});
-  $r->any('/:REWRITE_crm_CRM' => [REWRITE_crm_CRM => qr{form[\.:](crm|CRM)}])
+  $r->any('/:REWRITE_crm_CRM' => [REWRITE_crm_CRM => qr{form[\.:](?:crm|CRM)}])
     ->to('CGI#enter_bug_cgi' => {'format' => 'crm', 'product' => 'Marketing'});
   $r->any('/:REWRITE_nda' => [REWRITE_nda => qr{form[\.:]nda}])
     ->to('CGI#enter_bug_cgi' => {'product' => 'Legal', 'format' => 'nda'});

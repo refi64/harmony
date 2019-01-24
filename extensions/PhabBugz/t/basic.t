@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -171,6 +171,7 @@ do {
                     "authorPHID": "PHID-USER-4wigy3sh5fc5t74vapwm",
                     "dateCreated": 1507666113,
                     "dateModified": 1508514027,
+                    "diffPHID": "PHID-DIFF-x5fnvkz5rpco2pogzcrf",
                     "policy": {
                         "view": "public",
                         "edit": "admin"

@@ -10,6 +10,7 @@ package Bugzilla::Extension::PhabBugz::Revision;
 use 5.10.1;
 use Moo;
 
+use Mojo::JSON qw(true);
 use Scalar::Util qw(blessed);
 use Types::Standard -all;
 use Type::Utils;
@@ -35,6 +36,7 @@ has status           => (is => 'ro',   isa => Str);
 has creation_ts      => (is => 'ro',   isa => Str);
 has modification_ts  => (is => 'ro',   isa => Str);
 has author_phid      => (is => 'ro',   isa => Str);
+has diff_phid        => (is => 'ro',   isa => Str);
 has bug_id           => (is => 'ro',   isa => Str);
 has view_policy      => (is => 'ro',   isa => Str);
 has edit_policy      => (is => 'ro',   isa => Str);
@@ -62,6 +64,13 @@ has subscribers_raw => (
     subscriberPHIDs    => ArrayRef [Str],
     subscriberCount    => Int,
     viewerIsSubscribed => Bool | JSONBool,
+  ]
+);
+has projects_raw => (is => 'ro', isa => Dict [projectPHIDs => ArrayRef [Str]]);
+has reviewers_extra_raw => (
+  is  => 'ro',
+  isa => ArrayRef [
+    Dict [reviewerPHID => Str, voidedPHID => Maybe [Str], diffPHID => Maybe [Str]]
   ]
 );
 has projects_raw => (is => 'ro', isa => Dict [projectPHIDs => ArrayRef [Str]]);
@@ -100,6 +109,7 @@ sub BUILDARGS {
   $params->{creation_ts}     = $params->{fields}->{dateCreated};
   $params->{modification_ts} = $params->{fields}->{dateModified};
   $params->{author_phid}     = $params->{fields}->{authorPHID};
+  $params->{diff_phid}       = $params->{fields}->{diffPHID};
   $params->{bug_id}          = $params->{fields}->{'bugzilla.bug-id'};
   $params->{view_policy}     = $params->{fields}->{policy}->{view};
   $params->{edit_policy}     = $params->{fields}->{policy}->{edit};
@@ -107,6 +117,8 @@ sub BUILDARGS {
     // [];
   $params->{subscribers_raw} = $params->{attachments}->{subscribers};
   $params->{projects_raw}    = $params->{attachments}->{projects};
+  $params->{reviewers_extra_raw}
+    = $params->{attachments}->{'reviewers-extra'}->{'reviewers-extra'} // [];
   $params->{subscriber_count}
     = $params->{attachments}->{subscribers}->{subscriberCount};
 
@@ -226,6 +238,10 @@ sub update {
     }
   }
 
+  if ($self->{set_status}) {
+    push(@{$data->{transactions}}, {type => $self->{set_status}, value => true});
+  }
+
   if ($self->{add_projects}) {
     push(
       @{$data->{transactions}},
@@ -273,7 +289,26 @@ sub _build_reviews {
   my $users
     = Bugzilla::Extension::PhabBugz::User->match({phids => [keys %by_phid]});
 
-  return [map { {user => $_, status => $by_phid{$_->phid}{status},} } @$users];
+  my @reviewers;
+  foreach my $user (@{$users}) {
+    my $reviewer_data = {user => $user, status => $by_phid{$user->phid}{status}};
+
+# Set to accepted-prior if the diffs reviewer are different and the reviewer status is accepted
+    foreach my $reviewer_extra (@{$self->reviewers_extra_raw}) {
+      if ($reviewer_extra->{reviewerPHID} eq $user->phid) {
+        if ($reviewer_extra->{diffPHID}) {
+          if ( $reviewer_data->{status} eq 'accepted'
+            && $reviewer_extra->{diffPHID} ne $self->diff_phid)
+          {
+            $reviewer_data->{status} = 'accepted-prior';
+          }
+        }
+      }
+    }
+    push @reviewers, $reviewer_data;
+  }
+
+  return \@reviewers;
 }
 
 sub _build_subscribers {
@@ -360,6 +395,11 @@ sub set_policy {
   my ($self, $name, $policy) = @_;
   $self->{set_policy} ||= {};
   $self->{set_policy}->{$name} = $policy;
+}
+
+sub set_status {
+  my ($self, $status) = @_;
+  $self->{set_status} = $status;
 }
 
 sub add_project {

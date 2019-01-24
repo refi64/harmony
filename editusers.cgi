@@ -1,4 +1,4 @@
-#!/usr/bin/perl -T
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -32,6 +32,7 @@ my $dbh          = Bugzilla->dbh;
 my $userid       = $user->id;
 my $editusers    = $user->in_group('editusers');
 my $disableusers = $user->in_group('disableusers');
+
 local our $vars = {};
 
 # Reject access if there is no sense in continuing.

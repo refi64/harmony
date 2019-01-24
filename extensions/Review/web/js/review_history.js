@@ -48,7 +48,7 @@ $(function () {
         }
 
         var flagDS, bugDS, attachmentDS, historyTable;
-        flagDS = new Y.DataSource.IO({ source: 'jsonrpc.cgi' });
+        flagDS = new Y.DataSource.IO({ source: `${BUGZILLA.config.basepath}jsonrpc.cgi` });
         flagDS.plug(Y.Plugin.DataSourceJSONSchema, {
             schema: {
                 resultListLocator: 'result',
@@ -66,7 +66,7 @@ $(function () {
             }
         });
 
-        bugDS = new Y.DataSource.IO({ source: 'jsonrpc.cgi' });
+        bugDS = new Y.DataSource.IO({ source: `${BUGZILLA.config.basepath}jsonrpc.cgi` });
         bugDS.plug(Y.Plugin.DataSourceJSONSchema, {
             schema: {
                 resultListLocator: 'result.bugs',
@@ -77,7 +77,7 @@ $(function () {
             }
         });
 
-        attachmentDS = new Y.DataSource.IO({ source: 'jsonrpc.cgi' });
+        attachmentDS = new Y.DataSource.IO({ source: `${BUGZILLA.config.basepath}jsonrpc.cgi` });
         attachmentDS.plug(Y.Plugin.DataSourceJSONSchema, {
             schema: {
                 metaFields: { 'attachments': 'result.attachments' }
@@ -92,7 +92,7 @@ $(function () {
                 { key: "action", label: "Action", sortable: true,  formatter: format_action },
                 { key: "duration", label: "Duration", sortable: true, formatter: format_duration },
                 { key: "bug_id", label: "Bug", sortable: true, allowHTML: true,
-                  formatter: '<a href="show_bug.cgi?id={value}" target="_blank">{value}</a>' },
+                  formatter: `<a href="${BUGZILLA.config.basepath}show_bug.cgi?id={value}" target="_blank">{value}</a>` },
                 { key: 'bug_summary', label: 'Summary' }
             ]
         });
@@ -121,7 +121,7 @@ $(function () {
                 };
 
                 flagDS.sendRequest({
-                    request: Y.JSON.stringify({
+                    request: JSON.stringify({
                         version: '1.1',
                         method: 'Review.flag_activity',
                         params: {
@@ -143,7 +143,7 @@ $(function () {
         function fetch_flags(flag_ids) {
             return new Y.Promise(function (resolve, reject) {
                 flagDS.sendRequest({
-                    request: Y.JSON.stringify({
+                    request: JSON.stringify({
                         version: '1.1',
                         method: 'Review.flag_activity',
                         params: {
@@ -182,7 +182,7 @@ $(function () {
                 }));
 
                 bugDS.sendRequest({
-                    request: Y.JSON.stringify({
+                    request: JSON.stringify({
                         version: '1.1',
                         method: 'Bug.get',
                         params: {
@@ -223,7 +223,7 @@ $(function () {
                 }));
 
                 attachmentDS.sendRequest({
-                    request: Y.JSON.stringify({
+                    request: JSON.stringify({
                         version: '1.1',
                         method: 'Bug.attachments',
                         params: {
@@ -385,9 +385,9 @@ $(function () {
 
     }, '0.0.1', {
         requires: [
-            "node", "datatype-date", "datatable", "datatable-sort", "datatable-message", "json-stringify",
+            "node", "datatype-date", "datatable", "datatable-sort", "datatable-message",
             "datatable-datasource", "datasource-io", "datasource-jsonschema", "cookie",
-            "gallery-datatable-row-expansion-bmo", "handlebars", "escape", "promise"
+            "gallery-datatable-row-expansion-bmo", "handlebars", "promise"
         ]
     });
 });

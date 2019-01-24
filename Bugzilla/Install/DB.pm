@@ -773,6 +773,13 @@ sub update_table_definitions {
     {TYPE => 'FULLTEXT', FIELDS => ['realname']});
   _migrate_nicknames();
 
+  # Bug 1354589 - dkl@mozilla.com
+  _populate_oauth2_scopes();
+
+  # Bug 1510109 - kohei.yoshino@gmail.com
+  $dbh->bz_add_column('products', 'bug_description_template',
+    {TYPE => 'MEDIUMTEXT'});
+
   ################################################################
   # New --TABLE-- changes should go *** A B O V E *** this point #
   ################################################################
@@ -1849,6 +1856,51 @@ sub _convert_groups_system_from_groupset {
         while (my ($n) = $sth2->fetchrow_array) {
           push @logadd, $n;
         }
+        my $ladd = "";
+        my $lrem = "";
+        $ladd = join(", ", @logadd) . '?' if @logadd;
+        $lrem = join(", ", @logrem) . '?' if @logrem;
+
+        # Replace profiles_activity record for groupset change
+        # with group list.
+        $dbh->do("UPDATE profiles_activity "
+            . "SET fieldid = $bgfid, newvalue = "
+            . $dbh->quote($ladd)
+            . ", oldvalue = "
+            . $dbh->quote($lrem)
+            . " WHERE userid = $uid AND profiles_when = "
+            . $dbh->quote($uwhen)
+            . " AND who = $uwho AND fieldid = $gsid");
+      }
+    }
+
+    # Identify admin group.
+    my ($admin_gid)
+      = $dbh->selectrow_array("SELECT id FROM groups WHERE name = 'admin'");
+    if (!$admin_gid) {
+      $dbh->do(
+        q{INSERT INTO groups (name, description)
+                                   VALUES ('admin', 'Administrators')}
+      );
+      $admin_gid = $dbh->bz_last_key('groups', 'id');
+    }
+
+    # Find current admins
+    my @admins;
+
+    # Don't lose admins from DBs where Bug 157704 applies
+    $sth
+      = $dbh->prepare("SELECT userid, (groupset & 65536), login_name "
+        . "FROM profiles "
+        . "WHERE (groupset | 65536) = 9223372036854775807");
+    $sth->execute();
+    while (my ($userid, $iscomplete, $login_name) = $sth->fetchrow_array()) {
+
+      # existing administrators are made members of group "admin"
+      print "\nWARNING - $login_name IS AN ADMIN IN SPITE OF BUG", " 157704\n\n"
+        if (!$iscomplete);
+      push(@admins, $userid) unless grep($_ eq $userid, @admins);
+    }
 
         # Get names of groups removed.
         $sth2 = $dbh->prepare(
@@ -4181,15 +4233,7 @@ sub _migrate_group_owners {
   my $dbh = Bugzilla->dbh;
   return if $dbh->bz_column_info('groups', 'owner_user_id');
   $dbh->bz_add_column('groups', 'owner_user_id', {TYPE => 'INT3'});
-  my $nobody = Bugzilla::User->new(
-    {name => Bugzilla->params->{'nobody_user'}, cache => 1});
-  unless ($nobody) {
-    $nobody = Bugzilla::User->create({
-      login_name    => Bugzilla->params->{'nobody_user'},
-      realname      => 'Nobody (ok to assign bugs to)',
-      cryptpassword => '*',
-    });
-  }
+  my $nobody = Bugzilla::User->check('nobody@mozilla.org');
   $dbh->do('UPDATE groups SET owner_user_id = ?', undef, $nobody->id);
 }
 
@@ -4217,6 +4261,15 @@ sub _migrate_preference_categories {
     $dbh->do('UPDATE setting SET category = ? WHERE name = ?',
       undef, $params->{category}, $params->{name});
   }
+}
+
+sub _populate_oauth2_scopes {
+  my $dbh = Bugzilla->dbh;
+
+  # if there are no scopes, then we're creating a database from scratch
+  my ($scope_count) = $dbh->selectrow_array('SELECT COUNT(*) FROM oauth2_scope');
+  return if $scope_count;
+  $dbh->do("INSERT INTO oauth2_scope (id, description) VALUES (1, 'user:read')");
 }
 
 1;

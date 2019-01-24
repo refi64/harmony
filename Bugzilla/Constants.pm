@@ -196,8 +196,6 @@ use Memoize;
   EMAIL_LIMIT_EXCEPTION
 
   JOB_QUEUE_VIEW_MAX_JOBS
-
-  BZ_PERSISTENT
 );
 
 @Bugzilla::Constants::EXPORT_OK = qw(contenttypes);

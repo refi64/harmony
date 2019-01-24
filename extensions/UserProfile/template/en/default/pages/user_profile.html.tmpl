@@ -27,7 +27,7 @@
     <td>&nbsp;</td>
     <th>Search</th>
     <td colspan="2">
-      <form action="[% urlbase FILTER html %]user_profile">
+      <form action="[% basepath FILTER html %]user_profile">
         [% INCLUDE global/userselect.html.tmpl
           id => "login"
           name => "login"
@@ -46,8 +46,10 @@
 [% END %]
 
 <tr>
-  [% offset = user.id == target.id ? 2 : 0 %]
-  <td rowspan="[% user.id ? 6 + offset : 5 + offset %]" id="gravatar-container">
+  [% permissions_offset = target.in_group("canconfirm") == 1 ? 1 : 0 %]
+  [% creation_offset = target.can('creation_ts') == 1 ? 1 : 0 %]
+  [% edit_preferences_offset = user.id ? 1 : 0 %]
+   <td rowspan="[% 3 + edit_preferences_offset + permissions_offset + creation_offset FILTER html %]" id="gravatar-container">
     [% IF user.gravatar %]
       <img id="gravatar" src="[% target.gravatar(256) FILTER none %]" width="128" height="128"><br>
       [% IF target.id == user.id %]
@@ -57,25 +59,12 @@
       &nbsp;
     [% END %]
   </td>
-  <th>Name</th>
+  <th>User</th>
   <td colspan="2">
-    [% target.name || target.address.user FILTER html %]
+    [% INCLUDE bug_modal/user.html.tmpl u = target hide_profile = 1 %]
+    [% " (disabled)" UNLESS target.is_enabled %]
   </td>
 </tr>
-
-[% IF user.id %]
-  <tr>
-    <th>Email</th>
-    <td colspan="2">
-      <a href="mailto:[% target.login FILTER uri %]">[% target.login FILTER html %]</a>
-      [% " (disabled)" UNLESS target.is_enabled %]
-    </td>
-  </tr>
-  <tr>
-    <td>&nbsp;
-    </td>
-  </tr>
-[% END %]
 
 [%# user.creation_ts is added by the TagNewUsers extension %]
 [% IF target.can('creation_ts') %]
@@ -91,7 +80,7 @@
   <th>Last activity</th>
   <td colspan="2">
     [% IF user.id %]
-      <a href="page.cgi?id=user_activity.html&amp;action=run&amp;who=[% target.login FILTER uri %]">
+      <a href="[% basepath FILTER none %]page.cgi?id=user_activity.html&amp;action=run&amp;who=[% target.login FILTER uri %]">
     [% END %]
     [% target.last_activity_ts FILTER time %]
     [% "</a>" IF user.id %]
@@ -119,7 +108,7 @@
     <th></th>
     <td colspan="2">
       [% IF target.id == user.id %]
-        <a href="userprefs.cgi?tab=account"><input type="button" value = "Edit Profile & Preferences"></a>
+        <a href="[% basepath FILTER none %]userprefs.cgi?tab=account"><input type="button" value = "Edit Profile & Preferences"></a>
       [% END %]
     </td>
   </tr>
@@ -147,7 +136,7 @@
     <th>Review requests</th>
     <td class="numeric">
       [% IF user.id %]
-        <a href="request.cgi?action=queue&amp;type=review&amp;requestee=[% target.login FILTER uri %]&amp;group=type"
+        <a href="[% basepath FILTER none %]request.cgi?action=queue&amp;type=review&amp;requestee=[% target.login FILTER uri %]&amp;group=type"
           target="_blank">
       [% END %]
       [% target.review_request_count FILTER html %]
@@ -155,7 +144,7 @@
     </td>
     [% IF user.id %]
       <td>
-        (<a href="page.cgi?id=review_history.html&amp;requestee=[% target.login FILTER uri %]">Review History</a>)
+        (<a href="[% basepath FILTER none %]page.cgi?id=review_history.html&amp;requestee=[% target.login FILTER uri %]">Review History</a>)
       </td>
     [% END %]
   </tr>
@@ -164,7 +153,7 @@
     <th>Feedback requests</th>
     <td class="numeric">
       [% IF user.id %]
-        <a href="request.cgi?action=queue&amp;type=feedback&amp;requestee=[% target.login FILTER uri %]&amp;group=type"
+        <a href="[% basepath FILTER none %]request.cgi?action=queue&amp;type=feedback&amp;requestee=[% target.login FILTER uri %]&amp;group=type"
           target="_blank">
       [% END %]
       [% target.feedback_request_count FILTER html %]
@@ -176,7 +165,7 @@
     <th>Needinfo requests</th>
     <td class="numeric">
       [% IF user.id %]
-        <a href="request.cgi?action=queue&amp;type=needinfo&amp;requestee=[% target.login FILTER uri %]&amp;group=type"
+        <a href="[% basepath FILTER none %]request.cgi?action=queue&amp;type=needinfo&amp;requestee=[% target.login FILTER uri %]&amp;group=type"
           target="_blank">
       [% END %]
       [% target.needinfo_request_count FILTER html %]
@@ -197,7 +186,7 @@
   <th>[% terms.Bugs %] filed</th>
   <td class="numeric">
     [% IF user.id %]
-      <a href="buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emailreporter1=1&amp;email1=[% target.login FILTER uri %]"
+      <a href="[% basepath FILTER none %]buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emailreporter1=1&amp;email1=[% target.login FILTER uri %]"
         target="_blank">
     [% END %]
     [% stats.bugs_filed || 0 FILTER html %]
@@ -214,7 +203,7 @@
   <th>Assigned to</th>
   <td class="numeric">
     [% IF user.id %]
-      <a href="buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emailassigned_to1=1&amp;email1=[% target.login FILTER uri %]"
+      <a href="[% basepath FILTER none %]buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emailassigned_to1=1&amp;email1=[% target.login FILTER uri %]"
         target="_blank">
     [% END %]
     [% stats.assigned || 0 FILTER html %]
@@ -226,7 +215,7 @@
   <th>Commented on</th>
   <td class="numeric">
     [% IF user.id %]
-      <a href="buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emaillongdesc1=1&amp;email1=[% target.login FILTER uri %]"
+      <a href="[% basepath FILTER none %]buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emaillongdesc1=1&amp;email1=[% target.login FILTER uri %]"
         target="_blank">
     [% END %]
     [% stats.commented_on || 0 FILTER html %]
@@ -238,7 +227,7 @@
   <th>QA-Contact</th>
   <td class="numeric">
     [% IF user.id %]
-      <a href="buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emailqa_contact1=1&amp;email1=[% target.login FILTER uri %]"
+      <a href="[% basepath FILTER none %]buglist.cgi?query_format=advanced&amp;emailtype1=exact&amp;emailqa_contact1=1&amp;email1=[% target.login FILTER uri %]"
         target="_blank">
     [% END %]
     [% stats.qa_contact || 0 FILTER html %]
@@ -283,7 +272,7 @@
     [% FOREACH p = products %]
       <span class="product_span">
         [% IF p.product.id %]
-          <a href="describecomponents.cgi?product=[% p.product.name FILTER uri %]"
+          <a href="[% basepath FILTER none %]describecomponents.cgi?product=[% p.product.name FILTER uri %]"
             target="_blank">
         [% END %]
         [% p.product.name FILTER html %] ([% p.count || 0 FILTER html %])

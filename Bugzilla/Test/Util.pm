@@ -12,12 +12,23 @@ use strict;
 use warnings;
 
 use base qw(Exporter);
-our @EXPORT = qw(create_user issue_api_key mock_useragent_tx);
+our @EXPORT
+  = qw(create_user create_bug create_oauth_client issue_api_key mock_useragent_tx);
 
 use Bugzilla::User;
+use Bugzilla::Bug;
 use Bugzilla::User::APIKey;
+use Bugzilla::Util qw(generate_random_password);
 use Mojo::Message::Response;
 use Test2::Tools::Mock qw(mock);
+
+use Type::Params -all;
+use Types::Standard -types;
+
+our $Product   = 'Firefox';
+our $Component = 'General';
+our $Version   = 'unspecified';
+our $Priority  = 'P1';
 
 sub create_user {
   my ($login, $password, %extra) = @_;
@@ -30,6 +41,33 @@ sub create_user {
     extern_id     => undef,
     %extra,
   });
+}
+
+sub create_oauth_client {
+  my ($description, $scopes) = @_;
+  my $dbh = Bugzilla->dbh;
+
+  my $id     = generate_random_password(20);
+  my $secret = generate_random_password(40);
+
+  $dbh->do('INSERT INTO oauth2_client (id, description, secret) VALUES (?, ?, ?)',
+    undef, $id, $description, $secret);
+
+  foreach my $scope (@{$scopes}) {
+    my $scope_id
+      = $dbh->selectrow_array('SELECT id FROM oauth2_scope WHERE description = ?',
+      undef, $scope);
+    if (!$scope_id) {
+      die "Scope $scope not found";
+    }
+    $dbh->do(
+      'INSERT INTO oauth2_client_scope (client_id, scope_id, allowed) VALUES (?, ?, 1)',
+      undef, $id, $scope_id
+    );
+  }
+
+  return $dbh->selectrow_hashref('SELECT * FROM oauth2_client WHERE id = ?',
+    undef, $id);
 }
 
 sub issue_api_key {
@@ -48,6 +86,59 @@ sub issue_api_key {
   else {
     return Bugzilla::User::APIKey->create($params);
   }
+}
+
+sub create_bug {
+  state $check = compile_named(
+    short_desc => Str,
+    product    => Str,
+    {
+      default => sub {$Product}
+    },
+    component => Str,
+    {
+      default => sub {$Component}
+    },
+    bug_severity => Str,
+    {default => 'normal'},
+    groups => ArrayRef [Str],
+    {
+      default => sub { [] }
+    },
+    op_sys => Str,
+    {default => 'Unspecified'},
+    rep_platform => Str,
+    {default => 'Unspecified'},
+    version => Str,
+    {
+      default => sub {$Version}
+    },
+    keywords => ArrayRef [Str],
+    {
+      default => sub { [] }
+    },
+    cc => ArrayRef [Str],
+    {
+      default => sub { [] }
+    },
+    comment   => Str,
+    dependson => Str,
+    {default => ""},
+    blocked => Str,
+    {default => ""},
+    assigned_to => Str,
+    bug_mentors => ArrayRef [Str],
+    {
+      default => sub { [] }
+    },
+    priority => Str,
+    {
+      default => sub {$Priority}
+    }
+  );
+  my ($option) = $check->(@_);
+
+  return Bugzilla::Bug->create($option);
 }
 
 sub _json_content_type { $_->headers->content_type('application/json') }

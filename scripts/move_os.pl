@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -42,8 +42,7 @@ my $bug_ids
   = $dbh->selectcol_arrayref(q{SELECT bug_id FROM bugs WHERE bugs.op_sys = ?},
   undef, $from_os);
 my $field = Bugzilla::Field->check({name => 'op_sys', cache => 1});
-my $nobody = Bugzilla::User->check(
-  {name => Bugzilla->params->{'nobody_user'}, cache => 1});
+my $nobody = Bugzilla::User->check({name => 'nobody@mozilla.org', cache => 1});
 
 my $bug_count = @$bug_ids;
 if ($bug_count == 0) {

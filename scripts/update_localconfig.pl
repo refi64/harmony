@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -17,7 +17,7 @@ use Bugzilla::Config qw( :admin );
 use Bugzilla::Constants;
 use Bugzilla::Install::Localconfig;
 
-use File::Slurp;
+use Mojo::File qw(path);
 
 Bugzilla->usage_mode(USAGE_MODE_CMDLINE);
 
@@ -29,7 +29,7 @@ die "Invalid param name: $param_name\n"
   unless exists $localconfig->{$param_name};
 
 if ($localconfig->{$param_name} ne $param_value) {
-  my @file    = read_file('localconfig');
+  my @file = split(/\n/, path('localconfig')->slurp);
   my $updated = 0;
   foreach my $line (@file) {
     next unless $line =~ /^\s*\$([\w_]+)\s*=\s*'([^']*)'/;
@@ -40,7 +40,7 @@ if ($localconfig->{$param_name} ne $param_value) {
       $updated = 1;
     }
   }
-  write_file('localconfig', @file) if $updated;
+  path('localconfig')->spurt(join("\n", @file)) if $updated;
 }
 else {
   print "'$param_name' is already '$param_value'\n";

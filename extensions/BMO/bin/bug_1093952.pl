@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -55,7 +55,7 @@ printf "About to fix %s bugs\n", scalar(@$bugs);
 print "Press <Ctrl-C> to stop or <Enter> to continue...\n";
 getc();
 
-my $nobody = Bugzilla::User->check({name => Bugzilla->params->{'nobody_user'}});
+my $nobody = Bugzilla::User->check({name => 'nobody@mozilla.org'});
 my $field = Bugzilla::Field->check({name => 'status_whiteboard'});
 my $when = $dbh->selectrow_array('SELECT LOCALTIMESTAMP(0)');
 

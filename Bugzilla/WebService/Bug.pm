@@ -55,7 +55,7 @@ sub DATE_FIELDS {
   };
 
   # Add date related custom fields
-  foreach my $field (Bugzilla->active_custom_fields) {
+  foreach my $field (Bugzilla->active_custom_fields({skip_extensions => 1})) {
     next
       unless ($field->type == FIELD_TYPE_DATETIME
       || $field->type == FIELD_TYPE_DATE);
@@ -314,6 +314,10 @@ sub comments {
   my $dbh  = Bugzilla->switch_to_shadow_db();
   my $user = Bugzilla->user;
 
+  unless (Bugzilla->user->id) {
+    Bugzilla->check_rate_limit("get_comments", remote_ip());
+  }
+
   my %bugs;
   foreach my $bug_id (@$bug_ids) {
     my $bug = Bugzilla::Bug->check($bug_id);
@@ -370,7 +374,10 @@ sub render_comment {
   Bugzilla->switch_to_shadow_db();
   my $bug = $params->{id} ? Bugzilla::Bug->check($params->{id}) : undef;
 
-  my $html = Bugzilla::Template::quoteUrls($params->{text}, $bug);
+  my $html
+    = Bugzilla->params->{use_markdown}
+    ? Bugzilla->markdown->render_html($params->{text}, $bug)
+    : Bugzilla::Template::quoteUrls($params->{text}, $bug);
 
   return {html => $html};
 }
@@ -464,6 +471,10 @@ sub history {
   my $ids = $params->{ids};
   defined $ids || ThrowCodeError('param_required', {param => 'ids'});
 
+  my %api_type = (
+    %{{map { $_ => 'double' } Bugzilla::Bug::NUMERIC_COLUMNS()}},
+    %{{map { $_ => 'dateTime' } Bugzilla::Bug::DATE_COLUMNS()}},
+  );
   my %api_name = reverse %{Bugzilla::Bug::FIELD_MAP()};
   $api_name{'bug_group'} = 'groups';
 
@@ -484,15 +495,16 @@ sub history {
       $bug_history{who}  = $self->type('email',    $changeset->{who});
       $bug_history{changes} = [];
       foreach my $change (@{$changeset->{changes}}) {
-        my $api_field = $api_name{$change->{fieldname}} || $change->{fieldname};
-        my $attach_id = delete $change->{attachid};
+        my $field_name     = delete $change->{fieldname};
+        my $api_field_type = $api_type{$field_name} || 'string';
+        my $api_field_name = $api_name{$field_name} || $field_name;
+        my $attach_id      = delete $change->{attachid};
         if ($attach_id) {
           $change->{attachment_id} = $self->type('int', $attach_id);
         }
-        $change->{removed}    = $self->type('string', $change->{removed});
-        $change->{added}      = $self->type('string', $change->{added});
-        $change->{field_name} = $self->type('string', $api_field);
-        delete $change->{fieldname};
+        $change->{removed}    = $self->type($api_field_type, $change->{removed});
+        $change->{added}      = $self->type($api_field_type, $change->{added});
+        $change->{field_name} = $self->type('string',        $api_field_name);
         push(@{$bug_history{changes}}, $change);
       }
 
@@ -524,6 +536,7 @@ sub search {
   my $user = Bugzilla->user;
   my $dbh  = Bugzilla->dbh;
 
+  local $Bugzilla::Extension::TrackingFlags::Flag::SKIP_PRELOAD = 1;
   Bugzilla->switch_to_shadow_db();
 
   my $match_params = dclone($params);
@@ -592,7 +605,8 @@ sub search {
   # Backwards compatibility with old method regarding role search
   $match_params->{'reporter'} = delete $match_params->{'creator'}
     if $match_params->{'creator'};
-  foreach my $role (qw(assigned_to reporter qa_contact commenter cc)) {
+  foreach my $role (qw(assigned_to reporter qa_contact triage_owner commenter cc))
+  {
     next if !exists $match_params->{$role};
     my $value = delete $match_params->{$role};
     $match_params->{"f${last_field_id}"} = $role;
@@ -641,7 +655,7 @@ sub search {
       return $data;
     }
     else {
-      return {bug_count => $data};
+      return {bug_count => $self->type('int', $data)};
     }
   }
 
@@ -947,7 +961,11 @@ sub add_attachment {
   $dbh->bz_start_transaction();
   my $timestamp = $dbh->selectrow_array('SELECT LOCALTIMESTAMP(0)');
 
-  my $flags = delete $params->{flags};
+  my $flags     = delete $params->{flags};
+  my $comment   = delete $params->{comment};
+  my $bug_flags = delete $params->{bug_flags};
+
+  $comment = $comment ? trim($comment) : '';
 
   foreach my $bug (@bugs) {
     my $attachment = Bugzilla::Attachment->create({
@@ -967,8 +985,9 @@ sub add_attachment {
     }
 
     $attachment->update($timestamp);
-    my $comment = $params->{comment} || '';
-    $attachment->bug->add_comment(
+
+    # The comment has to be added even if it's empty
+    $bug->add_comment(
       $comment,
       {
         isprivate  => $attachment->isprivate,
@@ -976,6 +995,12 @@ sub add_attachment {
         extra_data => $attachment->id
       }
     );
+
+    if ($bug_flags) {
+      my ($old_flags, $new_flags) = extract_flags($bug_flags, $bug);
+      $bug->set_flags($old_flags, $new_flags);
+    }
+
     push(@created, $attachment);
   }
   $_->bug->update($timestamp) foreach @created;
@@ -1018,8 +1043,11 @@ sub update_attachment {
     $bugs{$bug->id} = $bug;
   }
 
-  my $flags   = delete $params->{flags};
-  my $comment = delete $params->{comment};
+  my $flags     = delete $params->{flags};
+  my $comment   = delete $params->{comment};
+  my $bug_flags = delete $params->{bug_flags};
+
+  $comment = $comment ? trim($comment) : '';
 
   # Update the values
   foreach my $attachment (@attachments) {
@@ -1059,9 +1087,10 @@ sub update_attachment {
   my @result;
   foreach my $attachment (@attachments) {
     my $changes = $attachment->update();
+    my $bug     = $attachment->bug;
 
-    if ($comment = trim($comment)) {
-      $attachment->bug->add_comment(
+    if ($comment) {
+      $bug->add_comment(
         $comment,
         {
           isprivate  => $attachment->isprivate,
@@ -1069,6 +1098,11 @@ sub update_attachment {
           extra_data => $attachment->id
         }
       );
+    }
+
+    if ($bug_flags) {
+      my ($old_flags, $new_flags) = extract_flags($bug_flags, $bug);
+      $bug->set_flags($old_flags, $new_flags);
     }
 
     $changes = translate($changes, ATTACHMENT_MAPPED_RETURNS);
@@ -1208,6 +1242,13 @@ sub update_see_also {
       # We still want a changes entry, for API consistency.
       $changes{$bug->id}->{see_also} = {added => [], removed => []};
     }
+    else {
+      # We still want a changes entry, for API consistency.
+      $changes{$bug->id}->{see_also} = {added => [], removed => []};
+    }
+
+    Bugzilla::BugMail::Send($bug->id, {changer => $user});
+  }
 
     Bugzilla::BugMail::Send($bug->id, {changer => $user});
   }
@@ -1227,6 +1268,10 @@ sub attachments {
 
   my $ids        = $params->{ids}            || [];
   my $attach_ids = $params->{attachment_ids} || [];
+
+  unless (Bugzilla->user->id) {
+    Bugzilla->check_rate_limit("get_attachments", remote_ip());
+  }
 
   my %bugs;
   foreach my $bug_id (@$ids) {
@@ -1468,6 +1513,14 @@ sub _bug_to_hash {
         = $self->_user_to_hash($bug->qa_contact, $params, undef, 'qa_contact');
     }
   }
+  if (filter_wants $params, 'triage_owner', ['extra']) {
+    my $triage_owner = $bug->component_obj->triage_owner;
+    $item{'triage_owner'} = $self->type('email', $triage_owner->login);
+    if ($triage_owner->login) {
+      $item{'triage_owner_detail'}
+        = $self->_user_to_hash($triage_owner, $params, ['extra'], 'triage_owner');
+    }
+  }
   if (filter_wants $params, 'see_also') {
     my @see_also = map { $self->type('string', $_->name) } @{$bug->see_also};
     $item{'see_also'} = \@see_also;
@@ -1552,6 +1605,7 @@ sub _user_to_hash {
     {
     id        => $self->type('int',    $user->id),
     real_name => $self->type('string', $user->name),
+    nick      => $self->type('string', $user->nick),
     name      => $self->type('email',  $user->login),
     email     => $self->type('email',  $user->email),
     },
@@ -2789,6 +2843,21 @@ C<string> The summary of this bug.
 C<string> The milestone that this bug is supposed to be fixed by, or for
 closed bugs, the milestone that it was fixed for.
 
+=item C<triage_owner>
+
+C<string> The login name of the Triage Owner of the bug's component.
+
+This is an B<extra> field returned only by specifying C<triage_owner> or
+C<_extra> in C<include_fields>.
+
+=item C<triage_owner_detail>
+
+C<hash> A hash containing detailed user information for the C<triage_owner>. To
+see the keys included in the user detail hash, see below.
+
+As with C<triage_owner>, this is an B<extra> field returned only by specifying
+C<triage_owner> or C<_extra> in C<include_fields>.
+
 =item C<update_token>
 
 C<string> The token that you would have to pass to the F<process_bug.cgi>
@@ -2845,6 +2914,11 @@ C<int> The user id for this user.
 =item C<real_name>
 
 C<string> The 'real' name for this user, if any.
+
+=item C<nick>
+
+C<string> The user's nickname. Currently this is extracted from the real_name,
+name or email field.
 
 =item C<name>
 
@@ -2958,7 +3032,7 @@ and all custom fields.
 =item The C<actual_time> item was added to the C<bugs> return value
 in Bugzilla B<4.4>.
 
-=item The C<duplicates> array was added in Bugzilla B<6.0>.
+=item The C<duplicates> and C<triage_owner> items were added in Bugzilla B<6.0>.
 
 =back
 
@@ -3303,6 +3377,10 @@ C<string> The login name of the bug's QA Contact. Note that even if
 this Bugzilla does not have the QA Contact field enabled, you can
 still search for bugs by QA Contact (though it is likely that no bug
 will have a QA Contact set, if the field is disabled).
+
+=item C<triage_owner>
+
+C<string> The login name of the Triage Owner of a bug's component.
 
 =item C<url>
 
@@ -3719,6 +3797,11 @@ C<string> The login of the requestee if the flag type is requestable to a specif
 
 =back
 
+=item C<bug_flags>
+
+C<array> An optional array of hashes with flags to add to the attachment's
+bug. See the C<flags> param for the L</update> method for the object format.
+
 =back
 
 =item B<Returns>
@@ -3892,6 +3975,11 @@ if more than one flag is set of the same name.
 C<boolean> Set to true if you specifically want a new flag to be created.
 
 =back
+
+=item C<bug_flags>
+
+C<array> An optional array of hashes with changes to the flags of the attachment's
+bug. See the C<flags> param for the L</update> method for the object format.
 
 =item B<Returns>
 

@@ -287,7 +287,7 @@ MOJO_CLIENTS
   that high concurrency works best with applications that perform mostly
   non-blocking operations, to optimize for blocking operations you can decrease
   this value and increase "MOJO_WORKERS" instead for better performance.
-  Default: 10
+  Default: 200
 
 BUGZILLA_UNSAFE_AUTH_DELEGATION
   This should never be set in production. It allows auth delegation over http.
@@ -342,6 +342,13 @@ BMO_site_wide_secret
   security features in Bugzilla, to protect against certain types of attacks.
   It's very important that this key is kept secret.
 
+BMO_jwt_secret
+  This secret key is used by your installation for the creation and validation
+  of jwts.  It's very important that this key is kept secret and it should be
+  different from the side_wide_secret. Changing this will invalidate all issued
+  jwts, so all oauth clients will need to start over. As such it should be a
+  high level of entropy, as it probably won't change for a very long time.
+
 BMO_inbound_proxies
   This is a list of IP addresses that we expect proxies to come from.
   This can be '*' if only the load balancer can connect to this container.
@@ -362,9 +369,13 @@ BMO_shadowdbhost
 BMO_shadowdbport
    The port of the read-only database.
 
-BMO_apache_size_limit
-  This is the max amount of unshared memory (in kb) that the apache process is
-  allowed to use before Apache::SizeLimit kills it.
+BMO_setrlimit
+    This is a json object and can set any limit described in https://metacpan.org/pod/BSD::Resource.
+    Typically it used for setting RLIMIT_AS, and the default value is ``{ "RLIMIT_AS": 2000000000 }``.
+
+BMO_size_limit
+  This is the max amount of unshared memory the worker processes are allowed to
+  use before they will exit. Minimum 750000 (750MiB)
 
 BMO_mail_delivery_method
   Usually configured on the MTA section of admin interface, but may be set here for testing purposes.

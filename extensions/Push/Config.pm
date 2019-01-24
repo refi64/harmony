@@ -21,7 +21,10 @@ use constant REQUIRED_MODULES => [
   {package => 'Crypt-DES_EDE3', module => 'Crypt::DES_EDE3', version => '0'},
 ];
 
-use constant OPTIONAL_MODULES =>
-  [{package => 'XML-Simple', module => 'XML::Simple', version => '0'},];
+use constant OPTIONAL_MODULES => [
+
+  # connectors need the ability to extend this
+  {package => 'XML-Simple', module => 'XML::Simple', version => '0'},
+];
 
 __PACKAGE__->NAME;

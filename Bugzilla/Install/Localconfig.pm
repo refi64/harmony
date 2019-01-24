@@ -23,6 +23,7 @@ use Bugzilla::Constants;
 use Bugzilla::Install::Util qw(bin_loc install_string);
 use Bugzilla::Util qw(generate_random_password wrap_hard);
 
+use Mojo::JSON qw(encode_json);
 use Data::Dumper;
 use File::Basename qw(dirname);
 use English qw($EGID);
@@ -49,19 +50,6 @@ use constant PARAM_OVERRIDE =>
 sub _sensible_group {
   return '' if ON_WINDOWS;
   return scalar getgrgid($EGID);
-}
-
-sub _migrate_param {
-  my ($name, $fallback_value) = @_;
-
-  return sub {
-    if (Bugzilla->can('params')) {
-      return Bugzilla->params->{$name} // $fallback_value;
-    }
-    else {
-      return $fallback_value;
-    }
-  };
 }
 
 use constant LOCALCONFIG_VARS => (
@@ -92,6 +80,7 @@ use constant LOCALCONFIG_VARS => (
     # is larger than anybody would ever be able to brute-force.
     default => sub { generate_random_password(64) },
   },
+  {name => 'jwt_secret', default => sub { generate_random_password(64) },},
   {
     name    => 'param_override',
     default => {
@@ -103,25 +92,20 @@ use constant LOCALCONFIG_VARS => (
       shadowdbsock         => undef,
     },
   },
-  {name => 'apache_size_limit', default => 600000,},
-  {
-    name    => 'memcached_servers',
-    default => _migrate_param("memcached_servers", ""),
-  },
-  {
-    name    => 'memcached_namespace',
-    default => _migrate_param("memcached_namespace", "bugzilla:"),
-  },
-  {name => 'urlbase',           default => _migrate_param("urlbase", ""),},
-  {name => 'canonical_urlbase', default => '',},
-  {name => 'attachment_base', default => _migrate_param("attachment_base", ''),},
-  {name => 'ses_username',    default => '',},
-  {name => 'ses_password',    default => '',},
-  {name => 'inbound_proxies', default => _migrate_param('inbound_proxies', ''),},
-  {name => 'shadowdb_user',   default => '',},
-  {name => 'shadowdb_pass',   default => '',},
-  {name => 'datadog_host',    default => '',},
-  {name => 'datadog_port',    default => 8125,},
+  {name => 'setrlimit',           default => encode_json({RLIMIT_AS => 2e9}),},
+  {name => 'size_limit',          default => 750000,},
+  {name => 'memcached_servers',   default => '',},
+  {name => 'memcached_namespace', default => "bugzilla:",},
+  {name => 'urlbase',             default => '',},
+  {name => 'canonical_urlbase',   default => '',},
+  {name => 'attachment_base',     default => '',},
+  {name => 'ses_username',        default => '',},
+  {name => 'ses_password',        default => '',},
+  {name => 'inbound_proxies',     default => '',},
+  {name => 'shadowdb_user',       default => '',},
+  {name => 'shadowdb_pass',       default => '',},
+  {name => 'datadog_host',        default => '',},
+  {name => 'datadog_port',        default => 8125,},
 );
 
 
@@ -234,6 +218,13 @@ sub read_localconfig {
 
   # Use the site's URL as the default Canonical URL
   $config->{canonical_urlbase} //= $config->{urlbase};
+
+  # Get the absolute path of the URLBase value
+  $config->{basepath} = do {
+    my $path = $config->{urlbase};
+    $path =~ s/^https?:\/\/.*?\//\//;
+    $path;
+  };
 
   return $config;
 }

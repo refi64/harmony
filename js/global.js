@@ -196,17 +196,6 @@ function bugzilla_ajax(request, done_fn, error_fn) {
         });
 }
 
-// polyfill .trim
-if (!String.prototype.trim) {
-    (function() {
-        // Make sure we trim BOM and NBSP
-        var rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
-        String.prototype.trim = function() {
-            return this.replace(rtrim, '');
-        };
-    })();
-}
-
 // html encoding
 if (!String.prototype.htmlEncode) {
     (function() {
@@ -249,7 +238,7 @@ const focus_main_content = () => {
 const detect_blocked_gravatars = () => {
     document.querySelectorAll('img[src^="https://secure.gravatar.com/avatar/"]').forEach($img => {
         if (!$img.complete || !$img.naturalHeight) {
-            $img.src = 'extensions/Gravatar/web/default.jpg';
+            $img.src = `${BUGZILLA.config.basepath}extensions/Gravatar/web/default.jpg`;
         }
     });
 }
@@ -316,3 +305,26 @@ window.addEventListener('DOMContentLoaded', focus_main_content, { once: true });
 window.addEventListener('load', detect_blocked_gravatars, { once: true });
 window.addEventListener('load', adjust_scroll_onload, { once: true });
 window.addEventListener('hashchange', adjust_scroll_onload);
+
+window.addEventListener('DOMContentLoaded', () => {
+  const announcement = document.getElementById('new_announcement');
+  if (announcement) {
+    const hide_announcement = () => {
+      const checksum = announcement.dataset.checksum;
+      const url = `${BUGZILLA.config.basepath}announcement/hide/${checksum}`;
+      fetch(url, { method: "POST" }).then(
+        response => announcement.style.display = "none"
+      );
+      localStorage.setItem("announcement_checksum", checksum);
+    }
+    announcement.addEventListener('click', hide_announcement);
+    window.addEventListener('visibilitychange', () => {
+      if (!window.hidden) {
+        const hidden_checksum = localStorage.getItem("announcement_checksum");
+        if (hidden_checksum && hidden_checksum == announcement.dataset.checksum) {
+          announcement.style.display = "none";
+        }
+      }
+    });
+  }
+}, { once: true });

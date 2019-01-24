@@ -15,7 +15,6 @@ has 'client' => (is => 'lazy');
 sub _build_client {
   my ($self) = @_;
 
-  require Search::Elasticsearch;
   return Search::Elasticsearch->new(
     nodes    => [split(/\s+/, Bugzilla->params->{elasticsearch_nodes})],
     cxn_pool => 'Sniff',

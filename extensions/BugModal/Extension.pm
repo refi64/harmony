@@ -187,11 +187,9 @@ sub template_before_process {
   return if exists $bug->{error};
 
   # trigger loading of tracking flags
-  if (Bugzilla->has_extension('TrackingFlags')) {
-    Bugzilla::Extension::TrackingFlags->template_before_process({
-      file => 'bug/edit.html.tmpl', vars => $vars,
-    });
-  }
+  Bugzilla::Extension::TrackingFlags->template_before_process({
+    file => 'bug/edit.html.tmpl', vars => $vars,
+  });
 
   if (any { $bug->product eq $_ } READABLE_BUG_STATUS_PRODUCTS) {
     my @flags = map { {name => $_->name, status => $_->status} } @{$bug->flags};
@@ -285,12 +283,14 @@ sub template_before_process {
   $vars->{tracking_flags_table} = \@tracking_table;
 
   # for the "view -> hide treeherder comments" menu item
-  my $treeherder_id = Bugzilla->treeherder_user->id;
+  my @treeherder_ids = map { $_->id } @{Bugzilla->treeherder_users};
   foreach my $change_set (@{$bug->activity_stream}) {
-    if ( $change_set->{comment}
-      && $change_set->{comment}->author->id == $treeherder_id)
+    if (
+      $change_set->{comment} && any { $change_set->{comment}->author->id == $_ }
+      @treeherder_ids
+      )
     {
-      $vars->{treeherder} = Bugzilla->treeherder_user;
+      $vars->{treeherder_user_ids} = \@treeherder_ids;
       last;
     }
   }

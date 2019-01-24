@@ -13,23 +13,73 @@ use MooX::StrictConstructor;
 
 use Bugzilla::Error;
 use Bugzilla::Status qw(is_open_state);
-use Bugzilla::Util qw(datetime_from);
+use Bugzilla::Util qw(datetime_from diff_arrays);
 use Bugzilla;
+
+use Chart::Clicker;
+use Chart::Clicker::Axis::DateTime;
+use Chart::Clicker::Data::Series;
+use Chart::Clicker::Data::DataSet;
+use Chart::Clicker::Renderer::Point;
+use Chart::Clicker::Renderer::StackedArea;
+
 use DateTime;
-use List::Util qw(any first sum);
+use JSON::PP::Boolean;
+use List::Util qw(any first sum uniq);
+use Mojo::File qw(tempfile);
 use POSIX qw(ceil);
 use Type::Utils;
-use Types::Standard qw(Num Int Bool Str HashRef ArrayRef CodeRef Map Dict Enum);
+use Types::Standard
+  qw(Num Int Bool Str HashRef ArrayRef CodeRef Maybe Map Dict Enum Optional Object);
 
 my $DateTime = class_type {class => 'DateTime'};
+my $JSONBool = class_type {class => 'JSON::PP::Boolean'};
 
 has 'start_date' => (is => 'ro', required => 1, isa => $DateTime,);
 
 has 'end_date' => (is => 'ro', required => 1, isa => $DateTime,);
 
-has 'products' => (is => 'ro', required => 1, isa => ArrayRef [Str],);
+# The teams are loaded from an admin parameter containing JSON, e.g.:
+# {
+#   "Plugins": {
+#     "Core": {
+#         "all_components": false,
+#         "prefixed_components": ["Plugin"],
+#         "named_components": [
+#             "Plug-ins"
+#         ]
+#     },
+#     "Plugins": { "all_components": true },
+#     "External Software Affecting Firefox": { "all_components": true }
+#   },
+#   ...
+# }
+# This will create a new team ("Plugins") which groups bugs in the following components:
+# - All components in the Core product that start with "Plugin" (e.g. Plugin:FlashPlayer)
+# - The single "Plug-ins" component in the Core product.
+# - All components in the Plugins _product_.
+# - All components in the External Software Affecting Firefox product.
+has 'teams' => (
+  is       => 'ro',
+  required => 1,
+  isa      => HashRef [
+    HashRef [
+      Dict [
+        all_components      => $JSONBool,
+        prefixed_components => Optional [ArrayRef [Str]],
+        named_components    => Optional [ArrayRef [Str]],
+      ],
+    ],
+  ],
+);
 
 has 'sec_keywords' => (is => 'ro', required => 1, isa => ArrayRef [Str],);
+
+has 'products' => (is => 'lazy', isa => ArrayRef [Str],);
+
+has 'missing_products' => (is => 'lazy', isa => ArrayRef [Str],);
+
+has 'missing_components' => (is => 'lazy', isa => ArrayRef [Str],);
 
 has 'initial_bug_ids' => (is => 'lazy', isa => ArrayRef [Int],);
 
@@ -39,7 +89,11 @@ has 'initial_bugs' => (
     Dict [
       id         => Int,
       product    => Str,
+      component  => Str,
+      team       => Maybe [Str],
       sec_level  => Str,
+      status     => Str,
+      is_stalled => Bool,
       is_open    => Bool,
       created_at => $DateTime,
     ],
@@ -66,8 +120,8 @@ has 'results' => (
   is  => 'lazy',
   isa => ArrayRef [
     Dict [
-      date            => $DateTime,
-      bugs_by_product => HashRef [
+      date         => $DateTime,
+      bugs_by_team => HashRef [
         Dict [open => ArrayRef [Int], closed => ArrayRef [Int], median_age_open => Num]
       ],
       bugs_by_sec_keyword => HashRef [
@@ -76,6 +130,97 @@ has 'results' => (
     ],
   ],
 );
+
+has 'deltas' => (
+  is  => 'lazy',
+  isa => Dict [
+    by_sec_keyword =>
+      HashRef [Dict [added => ArrayRef [Int], closed => ArrayRef [Int],],],
+    by_team => HashRef [Dict [added => ArrayRef [Int], closed => ArrayRef [Int],],],
+  ],
+);
+
+has 'graphs' => (
+  is  => 'lazy',
+  isa => Dict [
+    bugs_by_sec_keyword_count => Object,
+    bugs_by_sec_keyword_age   => Object,
+    bugs_by_team_age          => Object,
+  ],
+);
+
+sub _build_products {
+  my ($self) = @_;
+  my @products = ();
+  foreach my $team (values %{$self->teams}) {
+    foreach my $product (keys %$team) {
+      push @products, $product;
+    }
+  }
+  @products = uniq @products;
+  return \@products;
+}
+
+sub _build_missing_products {
+  my ($self) = @_;
+  my $dbh = Bugzilla->dbh;
+  my @products = map { $dbh->quote($_) } @{$self->products};
+  my $query = qq{
+        SELECT
+            name
+        FROM
+            products
+         WHERE
+            @{[$dbh->sql_in('products.name', \@products)]}
+    };
+  my $found_products = Bugzilla->dbh->selectcol_arrayref($query);
+  return (diff_arrays($self->products, $found_products))[0];
+}
+
+sub _build_missing_components {
+  my ($self) = @_;
+  my $dbh = Bugzilla->dbh;
+  my $products           = join ', ', map { $dbh->quote($_) } @{$self->products};
+  my @named_components   = ();
+  my @missing_components = ();
+  foreach my $team (values %{$self->teams}) {
+    foreach my $product (keys %$team) {
+      if (exists $team->{$product}->{named_components}) {
+        foreach my $component (@{$team->{$product}->{named_components}}) {
+          push @named_components, [$product, $component];
+        }
+      }
+    }
+  }
+
+  my @components = map { $dbh->quote($_->[1]) } @named_components;
+  my $query = qq{
+      SELECT
+          product.name,
+          component.name
+      FROM
+          components AS component
+          JOIN products AS product ON component.product_id = product.id
+      WHERE
+          @{[$dbh->sql_in('component.name', \@components)]}
+  };
+  my $found_components = Bugzilla->dbh->selectall_arrayref($query);
+
+  foreach my $named_component (@named_components) {
+    my $found = 0;
+    foreach my $found_component (@$found_components) {
+      if ( lc $named_component->[0] eq lc $found_component->[0]
+        && lc $named_component->[1] eq lc $found_component->[1])
+      {
+        $found = 1;
+        last;
+      }
+    }
+    push @missing_components, "$named_component->[0]::$named_component->[1]"
+      if !$found;
+  }
+  return \@missing_components;
+}
 
 sub _build_initial_bug_ids {
 
@@ -107,9 +252,12 @@ sub _build_initial_bugs {
   my $bugs      = {};
   my $bugs_list = Bugzilla::Bug->new_from_list($self->initial_bug_ids);
   for my $bug (@$bugs_list) {
+    my $is_stalled = grep { lc($_->name) eq 'stalled' } @{$bug->keyword_objects};
     $bugs->{$bug->id} = {
       id        => $bug->id,
       product   => $bug->product,
+      component => $bug->component,
+      team      => $self->_find_team($bug->product, $bug->component),
       sec_level => (
 
         # Select the first keyword matching one of the target keywords
@@ -120,7 +268,9 @@ sub _build_initial_bugs {
         }
         @{$bug->keyword_objects}
       )->name,
-      is_open    => $self->check_open_state->($bug->status->name),
+      status     => $bug->status->name,
+      is_stalled => scalar $is_stalled,
+      is_open    => $self->_is_bug_open($bug->status->name, scalar $is_stalled),
       created_at => datetime_from($bug->creation_ts),
     };
   }
@@ -170,11 +320,12 @@ sub _build_results {
 # We must generate a report for each week in the target time interval, regardless of
 # whether anything changed. The for loop here ensures that we do so.
   for (
-    my $report_date = $self->end_date;
+    my $report_date = $self->end_date->clone();
     $report_date >= $self->start_date;
     $report_date->subtract(weeks => 1)
     )
   {
+
 # We rewind events while there are still events existing which occured after the start
 # of the report week. The bugs will reflect a snapshot of how they were at the start of the week.
 # $self->events is ordered reverse chronologically, so the end of the array is the earliest event.
@@ -184,12 +335,14 @@ sub _build_results {
       my $event = @{$self->events}[$e];
       my $bug   = $bugs->{$event->{bug_id}};
 
+
       # Undo bug status changes
       if ($event->{field_name} eq 'bug_status') {
-        $bug->{is_open} = $self->check_open_state->($event->{removed});
+        $bug->{status} = $event->{removed};
+        $bug->{is_open} = $self->_is_bug_open($bug->{status}, $bug->{is_stalled});
       }
 
-      # Undo keyword changes
+      # Undo sec keyword changes
       if ($event->{field_name} eq 'keywords') {
         my $bug_sec_level = $bug->{sec_level};
         if ($event->{added} =~ /\b\Q$bug_sec_level\E\b/) {
@@ -200,10 +353,25 @@ sub _build_results {
         if ($event->{removed}) {
 
           # If a target sec keyword was removed, add the first one back.
-          my $removed_sec
-            = first { $event->{removed} =~ /\b\Q$_\E\b/ } @{$self->sec_keywords};
+          my $removed_sec = first { $event->{removed} =~ /\b\Q$_\E\b/ }
+          @{$self->sec_keywords};
           $bug->{sec_level} = $removed_sec if ($removed_sec);
         }
+      }
+
+      # Undo stalled keyword changes
+      if ($event->{field_name} eq 'keywords') {
+        if ($event->{added} =~ /\b\stalled\b/) {
+
+          # If the stalled keyword was added in this event, remove it:
+          $bug->{is_stalled} = 0;
+        }
+        if ($event->{removed} =~ /\b\stalled\b/) {
+
+          # If the stalled keyword was removed in this event, add it:
+          $bug->{is_stalled} = 1;
+        }
+        $bug->{is_open} = $self->_is_bug_open($bug->{status}, $bug->{is_stalled});
       }
 
       $e++;
@@ -220,8 +388,8 @@ sub _build_results {
     my $date_snapshot = $report_date->clone();
     my @bugs_snapshot = values %$bugs;
     my $result        = {
-      date            => $date_snapshot,
-      bugs_by_product => $self->_bugs_by_product($date_snapshot, @bugs_snapshot),
+      date         => $date_snapshot,
+      bugs_by_team => $self->_bugs_by_team($date_snapshot, @bugs_snapshot),
       bugs_by_sec_keyword =>
         $self->_bugs_by_sec_keyword($date_snapshot, @bugs_snapshot),
     };
@@ -231,27 +399,165 @@ sub _build_results {
   return [reverse @results];
 }
 
-sub _bugs_by_product {
+sub _build_graphs {
+  my ($self) = @_;
+  my $graphs = {};
+  my $data   = [
+    {
+      id    => 'bugs_by_sec_keyword_count',
+      title => sprintf(
+        'Open security bugs by severity (%s to %s)',
+        $self->start_date->ymd,
+        $self->end_date->ymd
+      ),
+      range_label => 'Open Bugs Count',
+      datasets    => [
+        map {
+          my $keyword = $_;
+          {
+            name   => $_,
+            keys   => [map { $_->{date}->epoch } @{$self->results}],
+            values => [
+              map { scalar @{$_->{bugs_by_sec_keyword}->{$keyword}->{open}} }
+                @{$self->results}
+            ],
+          }
+        } @{$self->sec_keywords}
+      ],
+      renderer   => Chart::Clicker::Renderer::StackedArea->new(opacity => .6),
+      image_file => tempfile(SUFFIX => '.png'),
+    },
+    {
+      id    => 'bugs_by_sec_keyword_age',
+      title => sprintf(
+        'Median age of open security bugs by severity (%s to %s)',
+        $self->start_date->ymd,
+        $self->end_date->ymd
+      ),
+      range_label => 'Median Age (days)',
+      datasets    => [
+        map {
+          my $keyword = $_;
+          {
+            name   => $_,
+            keys   => [map { $_->{date}->epoch } @{$self->results}],
+            values => [
+              map { $_->{bugs_by_sec_keyword}->{$keyword}->{median_age_open} }
+                @{$self->results}
+            ],
+          }
+        } @{$self->sec_keywords}
+      ],
+      image_file => tempfile(SUFFIX => '.png'),
+    },
+    {
+      id    => 'bugs_by_team_age',
+      title => sprintf(
+        'Median age of open security bugs by team (%s to %s)',
+        $self->start_date->ymd,
+        $self->end_date->ymd
+      ),
+      range_label => 'Median Age (days)',
+      datasets    => [
+        map {
+          my $team = $_;
+          {
+            name => $_,
+            keys => [map { $_->{date}->epoch } @{$self->results}],
+            values =>
+              [map { $_->{bugs_by_team}->{$team}->{median_age_open} } @{$self->results}],
+          }
+        } keys %{$self->teams}
+      ],
+      image_file => tempfile(SUFFIX => '.png'),
+    },
+  ];
+
+  foreach my $datum (@$data) {
+    my $cc = Chart::Clicker->new;
+    $cc->title->text($datum->{title});
+    $cc->title->font->size(14);
+    $cc->title->padding->bottom(5);
+    $cc->title->padding->top(5);
+    foreach my $dataset (@{$datum->{datasets}}) {
+      my $series = Chart::Clicker::Data::Series->new(
+        name   => $dataset->{name},
+        values => $dataset->{values},
+        keys   => $dataset->{keys},
+      );
+      my $ds = Chart::Clicker::Data::DataSet->new(series => [$series]);
+      $cc->add_to_datasets($ds);
+    }
+    my $ctx = $cc->get_context('default');
+    $ctx->renderer($datum->{renderer}) if exists $datum->{renderer};
+    $ctx->range_axis->label($datum->{range_label});
+    $ctx->domain_axis(Chart::Clicker::Axis::DateTime->new(
+      position    => 'bottom',
+      orientation => 'horizontal',
+      format      => "%m/%d",
+    ));
+    $cc->write_output($datum->{image_file});
+    $graphs->{$datum->{id}} = $datum->{image_file};
+  }
+
+  return $graphs;
+}
+
+sub _build_deltas {
+  my ($self) = @_;
+  my @teams = keys %{$self->teams};
+  my $deltas = {by_team => {}, by_sec_keyword => {}};
+  my $data = [
+    {domain => \@teams, results_key => 'bugs_by_team', deltas_key => 'by_team',},
+    {
+      domain      => $self->sec_keywords,
+      results_key => 'bugs_by_sec_keyword',
+      deltas_key  => 'by_sec_keyword',
+    }
+  ];
+
+  foreach my $datum (@$data) {
+    foreach my $item (@{$datum->{domain}}) {
+      my $current_result = $self->results->[-1]->{$datum->{results_key}}->{$item};
+      my $last_result    = $self->results->[-2]->{$datum->{results_key}}->{$item};
+
+      my @all_bugs_this_week
+        = (@{$current_result->{open}}, @{$current_result->{closed}});
+      my @all_bugs_last_week = (@{$last_result->{open}}, @{$last_result->{closed}});
+
+      my $added_delta = (diff_arrays(\@all_bugs_this_week, \@all_bugs_last_week))[0];
+      my $closed_delta
+        = (diff_arrays($current_result->{closed}, $last_result->{closed}))[0];
+
+      $deltas->{$datum->{deltas_key}}->{$item}
+        = {added => $added_delta, closed => $closed_delta};
+    }
+  }
+  return $deltas;
+}
+
+sub _bugs_by_team {
   my ($self, $report_date, @bugs) = @_;
   my $result = {};
   my $groups = {};
-  foreach my $product (@{$self->products}) {
-    $groups->{$product} = [];
+  foreach my $team (keys %{$self->teams}) {
+    $groups->{$team} = [];
   }
   foreach my $bug (@bugs) {
 
     # We skip over bugs with no sec level which can happen during event rewinding.
-    if ($bug->{sec_level}) {
-      push @{$groups->{$bug->{product}}}, $bug;
+    # We also skip over bugs that don't fall into one of the specified teams.
+    if (defined $bug->{sec_level} && defined $bug->{team}) {
+      push @{$groups->{$bug->{team}}}, $bug;
     }
   }
-  foreach my $product (@{$self->products}) {
-    my @open   = map { $_->{id} } grep { ($_->{is_open}) } @{$groups->{$product}};
-    my @closed = map { $_->{id} } grep { !($_->{is_open}) } @{$groups->{$product}};
+  foreach my $team (keys %{$self->teams}) {
+    my @open   = map { $_->{id} } grep { ($_->{is_open}) } @{$groups->{$team}};
+    my @closed = map { $_->{id} } grep { !($_->{is_open}) } @{$groups->{$team}};
     my @ages   = map {
       $_->{created_at}->subtract_datetime_absolute($report_date)->seconds / 86_400;
-    } grep { ($_->{is_open}) } @{$groups->{$product}};
-    $result->{$product} = {
+    } grep { ($_->{is_open}) } @{$groups->{$team}};
+    $result->{$team} = {
       open            => \@open,
       closed          => \@closed,
       median_age_open => @ages ? _median(@ages) : 0,
@@ -271,7 +577,7 @@ sub _bugs_by_sec_keyword {
   foreach my $bug (@bugs) {
 
     # We skip over bugs with no sec level which can happen during event rewinding.
-    if ($bug->{sec_level}) {
+    if (defined $bug->{sec_level}) {
       push @{$groups->{$bug->{sec_level}}}, $bug;
     }
   }
@@ -292,10 +598,31 @@ sub _bugs_by_sec_keyword {
   return $result;
 }
 
+sub _is_bug_open {
+  my ($self, $status, $is_stalled) = @_;
+  return ($self->check_open_state->($status)) && !($is_stalled);
+}
+
+sub _find_team {
+  my ($self, $product, $component) = @_;
+  foreach my $team_key (keys %{$self->teams}) {
+    my $team = $self->teams->{$team_key};
+    if (exists $team->{$product}) {
+      return $team_key if $team->{$product}->{all_components};
+      return $team_key
+        if any { lc $component eq lc $_ } @{$team->{$product}->{named_components}};
+      return $team_key if any { $component =~ /^\Q$_\E/i }
+      @{$team->{$product}->{prefixed_components}};
+    }
+  }
+  return undef;
+}
+
 sub _median {
 
   # From tlm @ https://www.perlmonks.org/?node_id=474564. Jul 14, 2005
   return sum((sort { $a <=> $b } @_)[int($#_ / 2), ceil($#_ / 2)]) / 2;
 }
+
 
 1;

@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License,  v. 2.0. If a copy of the MPL was not distributed with this
 # file,  You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -55,7 +55,7 @@ if (!$product
 }
 
 # We will need these for entering into bugs_activity
-my $who = Bugzilla::User->new({name => Bugzilla->params->{'nobody_user'}});
+my $who = Bugzilla::User->new({name => 'nobody@mozilla.org'});
 my $field = Bugzilla::Field->new({name => $field_name});
 
 trick_taint($product);

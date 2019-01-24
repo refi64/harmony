@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -77,7 +77,7 @@ foreach my $group_id (keys %remove_data) {
   $dbh->bz_commit_transaction();
 
   # nobody@mozilla.org cannot recieve email
-  next if $group->owner->login eq Bugzilla->params->{'nobody_user'};
+  next if $group->owner->login eq 'nobody@mozilla.org';
 
   _send_email($group, \@users_removed);
 }

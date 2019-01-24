@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -22,7 +22,7 @@ Bugzilla->usage_mode(USAGE_MODE_CMDLINE);
 
 my $dbh = Bugzilla->dbh;
 my @remove_group_names;
-my $nobody_name = Bugzilla->params->{'nobody_user'};
+my $nobody_name = 'nobody@mozilla.org';
 my $admin_name  = 'automation@bmo.tld';
 
 GetOptions(

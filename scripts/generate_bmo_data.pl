@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -114,29 +114,17 @@ if (!$dbh->selectrow_array("SELECT 1 FROM rep_platform WHERE value = 'ARM'")) {
 }
 
 my @oses = (
-  'All',
-  'Windows',
-  'Windows XP',
-  'Windows Server 2008',
-  'Windows Vista',
-  'Windows 7',
-  'Windows 8',
-  'Windows 8.1',
-  'Windows 10',
-  'Windows Phone',
-  'Mac OS X',
-  'Linux',
-  'Gonk (Firefox OS)',
-  'Android',
-  'iOS',
-  'iOS 7',
-  'iOS 8',
-  'BSDI',
-  'FreeBSD',
-  'NetBSD',
-  'OpenBSD',
-  'Unspecified',
-  'Other'
+  'All',           'Windows',
+  'Windows XP',    'Windows Server 2008',
+  'Windows Vista', 'Windows 7',
+  'Windows 8',     'Windows 8.1',
+  'Windows 10',    'Windows Phone',
+  'Mac OS X',      'Linux',
+  'Android',       'iOS',
+  'iOS 7',         'iOS 8',
+  'BSDI',          'FreeBSD',
+  'NetBSD',        'OpenBSD',
+  'Unspecified',   'Other'
 );
 
 if (!$dbh->selectrow_array("SELECT 1 FROM op_sys WHERE value = 'AIX'")) {
@@ -158,7 +146,7 @@ $group->update();
 
 my @users = (
   {
-    login    => Bugzilla->params->{'nobody_user'},
+    login    => 'nobody@mozilla.org',
     realname => 'Nobody; OK to take it and work on it',
     password => '*'
   },
@@ -243,7 +231,7 @@ my @products = (
       name        => 'General',
       description => 'For bugs in Firefox which do not fit into '
         . 'other more specific Firefox components',
-      initialowner   => Bugzilla->params->{'nobody_user'},
+      initialowner   => 'nobody@mozilla.org',
       initialqaowner => '',
       initial_cc     => [],
       watch_user     => 'general@firefox.bugs'
@@ -262,7 +250,7 @@ my @products = (
       description =>
         'This is the component for issues specific to bugzilla.mozilla.org '
         . 'that do not belong in other components.',
-      initialowner   => Bugzilla->params->{'nobody_user'},
+      initialowner   => 'nobody@mozilla.org',
       initialqaowner => '',
       initial_cc     => [],
       watch_user     => 'general@bugzilla.bugs'
@@ -366,13 +354,6 @@ my @groups = (
     no_admin     => 1,
     bug_group    => 1,
     all_products => 1,
-  },
-  {
-    name         => 'can_edit_comments',
-    description  => 'Members of this group will be able to edit comments',
-    no_admin     => 0,
-    bug_group    => 0,
-    all_products => 0,
   },
   {
     name => 'can_restrict_comments',
@@ -507,7 +488,7 @@ my %set_params = (
     . '&emailtype2=exact&order=Importance&keywords_type=allwords'
     . '&long_desc_type=substring',
   defaultseverity      => 'normal',
-  edit_comments_group  => 'can_edit_comments',
+  edit_comments_group  => 'editbugs',
   insidergroup         => 'core-security-release',
   last_visit_keep_days => '28',
   lxr_url              => 'http://mxr.mozilla.org/mozilla',

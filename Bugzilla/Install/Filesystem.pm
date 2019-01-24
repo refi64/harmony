@@ -32,8 +32,8 @@ use File::Path;
 use File::Basename;
 use File::Copy qw(move);
 use File::Spec;
+use Mojo::File qw(path);
 use Cwd ();
-use File::Slurp;
 use IO::File;
 use POSIX ();
 use English qw(-no_match_vars $OSNAME);
@@ -45,18 +45,6 @@ our @EXPORT = qw(
   fix_dir_permissions
   fix_file_permissions
 );
-
-use constant INDEX_HTML => <<'EOT';
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-  <meta http-equiv="Refresh" content="0; URL=index.cgi">
-</head>
-<body>
-  <h1>I think you are looking for <a href="index.cgi">index.cgi</a></h1>
-</body>
-</html>
-EOT
 
 use constant HTTPD_ENV => qw(
   LOCALCONFIG_ENV
@@ -173,7 +161,6 @@ sub FILESYSTEM {
     # users to be able to cron them or otherwise run
     # them as a secure user, like the webserver owner.
     '*.cgi'                        => {perms => WS_EXECUTE},
-    '*.psgi'                       => {perms => CGI_READ},
     'whineatnews.pl'               => {perms => WS_EXECUTE},
     'collectstats.pl'              => {perms => WS_EXECUTE},
     'importxml.pl'                 => {perms => WS_EXECUTE},
@@ -275,7 +262,7 @@ sub FILESYSTEM {
     'docs/lib'   => {files => OWNER_WRITE,   dirs => DIR_OWNER_WRITE},
     'docs/*/xml' => {files => OWNER_WRITE,   dirs => DIR_OWNER_WRITE},
     'contrib'    => {files => OWNER_EXECUTE, dirs => DIR_OWNER_WRITE,},
-    'scripts'    => {files => OWNER_EXECUTE, dirs => DIR_WS_SERVE,},
+    'scripts'    => {files => OWNER_EXECUTE, dirs => DIR_OWNER_WRITE,},
   );
 
   # --- FILES TO CREATE --- #
@@ -312,30 +299,31 @@ sub FILESYSTEM {
     return join(
       "\n",
       map {
-        my $css = read_file($_);
+        my $css = path($_)->slurp;
         _css_url_fix($css, $_, "skins/yui.css.list")
-      } read_file("skins/yui.css.list", {chomp => 1})
+      } split(/\n/, path("skins/yui.css.list")->slurp)
     );
   };
 
   my $yui_all_js = sub {
-    return join("\n",
-      map { scalar read_file($_) } read_file("js/yui.js.list", {chomp => 1}));
+    return
+      join("\n",
+      map { path($_)->slurp } split(/\n/, path("js/yui.js.list")->slurp));
   };
 
   my $yui3_all_css = sub {
     return join(
       "\n",
       map {
-        my $css = read_file($_);
+        my $css = path($_)->slurp;
         _css_url_fix($css, $_, "skins/yui3.css.list")
-      } read_file("skins/yui3.css.list", {chomp => 1})
+      } split(/\n/, path("skins/yui3.css.list")->slurp)
     );
   };
 
   my $yui3_all_js = sub {
     return join("\n",
-      map { scalar read_file($_) } read_file("js/yui3.js.list", {chomp => 1}));
+      map { path($_)->slurp } split(/\n/, path('js/yui3.js.list')->slurp));
   };
 
   # The name of each file, pointing at its default permissions and
@@ -356,13 +344,6 @@ sub FILESYSTEM {
       {perms => CGI_READ, overwrite => 1, contents => $yui3_all_css},
   );
 
-  # Create static error pages.
-  $create_dirs{"errors"} = DIR_CGI_READ;
-
-  # Because checksetup controls the creation of index.html separately
-  # from all other files, it gets its very own hash.
-  my %index_html = ('index.html' => {perms => WS_SERVE, contents => INDEX_HTML});
-
   Bugzilla::Hook::process(
     'install_filesystem',
     {
@@ -374,7 +355,7 @@ sub FILESYSTEM {
     }
   );
 
-  my %all_files = (%create_files, %index_html, %files);
+  my %all_files = (%create_files, %files);
   my %all_dirs = (%create_dirs, %non_recurse_dirs);
 
   return {
@@ -383,7 +364,6 @@ sub FILESYSTEM {
     all_dirs     => \%all_dirs,
 
     create_files => \%create_files,
-    index_html   => \%index_html,
     all_files    => \%all_files,
   };
 }
@@ -433,21 +413,11 @@ sub update_filesystem {
   }
 
   _create_files(%files);
-  if ($params->{index_html}) {
-    _create_files(%{$fs->{index_html}});
-  }
-  elsif (-e 'index.html') {
-    my $templatedir = bz_locations()->{'templatedir'};
-    print "*** It appears that you still have an old index.html hanging around.\n",
-      "Either the contents of this file should be moved into a template and\n",
-      "placed in the '$templatedir/en/custom' directory, or you should delete\n",
-      "the file.\n";
-  }
 
   # Delete old files that no longer need to exist
 
   # 2001-04-29 jake@bugzilla.org - Remove oldemailtech
-  #   http://bugzilla.mozilla.org/show_bug.cgi?id=71552
+  #   http://bugzilla.mozilla.org/show_bugs.cgi?id=71552
   if (-d 'shadow') {
     print "Removing shadow directory...\n";
     rmtree("shadow");
@@ -854,15 +824,14 @@ filesystem during installation, including creating the data/ directory.
 
 =over
 
-=item C<update_filesystem({ index_html => 0 })>
+=item C<update_filesystem()>
 
 Description: Creates all the directories and files that Bugzilla
              needs to function but doesn't ship with. Also does
              any updates to these files as necessary during an
              upgrade.
 
-Params:      C<index_html> - Whether or not we should create
-               the F<index.html> file.
+Params:      none
 
 Returns:     nothing
 

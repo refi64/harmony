@@ -8,10 +8,21 @@ use 5.10.1;
 use strict;
 use warnings;
 use lib qw( . lib local/lib/perl5 );
+
+use Bugzilla::Test::MockDB;
+use Bugzilla::Test::MockParams (password_complexity => 'no_constraints');
+use Mojo::DOM;
 use Bugzilla;
 use Test2::V0;
 
-my $parser = Bugzilla->markdown_parser;
+my $have_cmark_gfm = eval {
+    require Alien::libcmark_gfm;
+    require Bugzilla::Markdown::GFM;
+};
+
+plan skip_all => "these tests require Alien::libcmark_gfm" unless $have_cmark_gfm;
+
+my $parser = Bugzilla->markdown;
 
 is($parser->render_html('# header'), "<h1>header</h1>\n", 'Simple header');
 
@@ -27,11 +38,14 @@ is(
   'Autolink extension'
 );
 
-is(
-  $parser->render_html('<script>hijack()</script>'),
-  "&lt;script>hijack()&lt;/script>\n",
-  'Tagfilter extension'
-);
+SKIP: {
+  skip("currently no raw html is allowed via the safe option", 1);
+  is(
+    $parser->render_html('<script>hijack()</script>'),
+    "&lt;script&gt;hijack()&lt;/script&gt;\n",
+    'Tagfilter extension'
+  );
+}
 
 is(
   $parser->render_html('~~strikethrough~~'),
@@ -63,5 +77,18 @@ my $table_html = <<'HTML';
 HTML
 
 is($parser->render_html($table_markdown), $table_html, 'Table extension');
+
+{
+  no warnings 'utf8';
+  is($parser->render_html("\x{FDD4}"), "", "strips out PUA char");
+}
+
+my $angle_link =  $parser->render_html("<https://searchfox.org/mozilla-central/rev/76fe4bb385348d3f45bbebcf69ba8c7283dfcec7/mobile/android/base/java/org/mozilla/gecko/toolbar/SecurityModeUtil.java#101>");
+
+my $angle_link_dom = Mojo::DOM->new($angle_link);
+my $ahref = $angle_link_dom->at('a[href]');
+is($ahref->attr('href'), 'https://searchfox.org/mozilla-central/rev/76fe4bb385348d3f45bbebcf69ba8c7283dfcec7/mobile/android/base/java/org/mozilla/gecko/toolbar/SecurityModeUtil.java#101', 'angle links are parsed properly');
+
+is($parser->render_html('<foo>'), "<p>&lt;foo&gt;</p>\n", "literal tags work");
 
 done_testing;

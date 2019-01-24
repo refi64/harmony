@@ -53,8 +53,7 @@ sub suggestions {
     # we always need to be authentiated to perform user matching
     my $user = Bugzilla->user;
     if (!$user->id) {
-      Bugzilla->set_user(Bugzilla::User->check(
-        {name => Bugzilla->params->{'nobody_user'}}));
+      Bugzilla->set_user(Bugzilla::User->check({name => 'nobody@mozilla.org'}));
       push @reviewers, @{$bug->mentors};
       Bugzilla->set_user($user);
     }
@@ -76,6 +75,7 @@ sub suggestions {
       id           => $self->type('int',    $reviewer->id),
       email        => $self->type('email',  $reviewer->login),
       name         => $self->type('string', $reviewer->name),
+      nick         => $self->type('string', $reviewer->nick),
       review_count => $self->type('int',    $reviewer->review_count),
       };
   }
@@ -307,6 +307,7 @@ sub _user_to_hash {
   return {
     id        => $self->type('int',    $user->id),
     real_name => $self->type('string', $user->name),
+    nick      => $self->type('string', $user->nick),
     name      => $self->type('email',  $user->login),
   };
 }
@@ -465,7 +466,7 @@ An object with the following fields:
 
 =item C<id> (integer)
 
-The flag type id of the flag that changed
+The id of this activity event.
 
 =item C<name> (string)
 
@@ -506,6 +507,11 @@ The id of the bugzilla user. A unique integer value.
 =item C<real_name> (string)
 
 The real name of the bugzilla user.
+
+=item C<nick> (string)
+
+The user's nickname. Currently this is extracted from the real_name, name or
+email field.
 
 =item C<name> (string)
 

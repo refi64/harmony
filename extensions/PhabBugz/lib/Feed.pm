@@ -45,6 +45,33 @@ use Bugzilla::Extension::PhabBugz::Util qw(
 has 'is_daemon' => (is => 'rw', default => 0);
 
 my $Invocant = class_type {class => __PACKAGE__};
+my $CURRENT_QUERY = 'none';
+
+sub run_query {
+  my ($self, $name) = @_;
+  my $method = $name . '_query';
+  try {
+    with_writable_database {
+      alarm(PHAB_TIMEOUT);
+      $CURRENT_QUERY = $name;
+      $self->$method;
+    };
+  }
+  catch {
+    FATAL($_);
+  }
+  finally {
+    alarm(0);
+    $CURRENT_QUERY = 'none';
+    try {
+      Bugzilla->_cleanup();
+    }
+    catch {
+      FATAL("Error in _cleanup: $_");
+      exit 1;
+    }
+  };
+}
 
 sub start {
   my ($self) = @_;
@@ -52,8 +79,14 @@ sub start {
   my $sig_alarm = IO::Async::Signal->new(
     name       => 'ALRM',
     on_receipt => sub {
-      FATAL("Timeout reached");
-      exit;
+      FATAL("Timeout reached while executing $CURRENT_QUERY query");
+
+      if (my $dd = Bugzilla->datadog) {
+        my $lcname = lc $CURRENT_QUERY;
+        $dd->increment("bugzilla.phabbugz.${lcname}_query_timeouts");
+      }
+
+      exit 1;
     },
   );
 
@@ -62,21 +95,7 @@ sub start {
     first_interval => 0,
     interval       => PHAB_FEED_POLL_SECONDS,
     reschedule     => 'drift',
-    on_tick        => sub {
-      try {
-        with_writable_database {
-          alarm(PHAB_TIMEOUT);
-          $self->feed_query();
-        };
-      }
-      catch {
-        FATAL($_);
-      }
-      finally {
-        alarm(0);
-        Bugzilla->_cleanup();
-      };
-    },
+    on_tick        => sub { $self->run_query('feed') },
   );
 
   # Query for new users
@@ -84,21 +103,7 @@ sub start {
     first_interval => 0,
     interval       => PHAB_USER_POLL_SECONDS,
     reschedule     => 'drift',
-    on_tick        => sub {
-      try {
-        with_writable_database {
-          alarm(PHAB_TIMEOUT);
-          $self->user_query();
-        };
-      }
-      catch {
-        FATAL($_);
-      }
-      finally {
-        alarm(0);
-        Bugzilla->_cleanup();
-      };
-    },
+    on_tick        => sub { $self->run_query('user') },
   );
 
   # Update project membership in Phabricator based on Bugzilla groups
@@ -106,22 +111,7 @@ sub start {
     first_interval => 0,
     interval       => PHAB_GROUP_POLL_SECONDS,
     reschedule     => 'drift',
-    on_tick        => sub {
-      try {
-        with_writable_database {
-          alarm(PHAB_TIMEOUT);
-          $self->group_query();
-        };
-      }
-      catch {
-        FATAL($_);
-      }
-      finally {
-        alarm(0);
-        Bugzilla->_cleanup();
-      };
-
-    },
+    on_tick        => sub { $self->run_query('group') },
   );
 
   my $loop = IO::Async::Loop->new;
@@ -129,9 +119,11 @@ sub start {
   $loop->add($user_timer);
   $loop->add($group_timer);
   $loop->add($sig_alarm);
+
   $feed_timer->start;
   $user_timer->start;
   $group_timer->start;
+
   $loop->run;
 }
 
@@ -192,9 +184,8 @@ sub feed_query {
     }
     else {
       my $phab_user = Bugzilla::User->new({name => PHAB_AUTOMATION_USER});
-      $author
-        = Bugzilla::Extension::PhabBugz::User->new_from_query({ids => [$phab_user->id]
-        });
+      $author = Bugzilla::Extension::PhabBugz::User->new_from_query(
+        {ids => [$phab_user->id]});
     }
 
     # Load the revision from Phabricator
@@ -202,42 +193,6 @@ sub feed_query {
       {phids => [$object_phid]});
     $self->process_revision_change($revision, $author, $story_text);
     $self->save_last_id($story_id, 'feed');
-  }
-
-  # Process any build targets as well.
-  my $dbh = Bugzilla->dbh;
-
-  INFO("Checking for revisions in draft mode");
-  my $build_targets
-    = $dbh->selectall_arrayref(
-    "SELECT name, value FROM phabbugz WHERE name LIKE 'build_target_%'",
-    {Slice => {}});
-
-  my $delete_build_target
-    = $dbh->prepare("DELETE FROM phabbugz WHERE name = ? AND VALUE = ?");
-
-  foreach my $target (@$build_targets) {
-    my ($revision_id) = ($target->{name} =~ /^build_target_(\d+)$/);
-    my $build_target = $target->{value};
-
-    next unless $revision_id && $build_target;
-
-    INFO("Processing revision $revision_id with build target $build_target");
-
-    my $revision
-      = Bugzilla::Extension::PhabBugz::Revision->new_from_query({
-      ids => [int($revision_id)]
-      });
-
-    $self->process_revision_change($revision, $revision->author,
-      " created D" . $revision->id);
-
-    # Set the build target to a passing status to
-    # allow the revision to exit draft state
-    request('harbormaster.sendmessage',
-      {buildTargetPHID => $build_target, type => 'pass'});
-
-    $delete_build_target->execute($target->{name}, $target->{value});
   }
 
   if (Bugzilla->datadog) {
@@ -391,14 +346,19 @@ sub group_query {
 sub process_revision_change {
   state $check = compile($Invocant, Revision, LinkedPhabUser, Str);
   my ($self, $revision, $changer, $story_text) = $check->(@_);
+  my $is_new = $story_text =~ /\s+created\s+D\d+/;
 
   # NO BUG ID
   if (!$revision->bug_id) {
-    if ($story_text =~ /\s+created\s+D\d+/) {
+    if ($is_new) {
 
       # If new revision and bug id was omitted, make revision public
       INFO("No bug associated with new revision. Marking public.");
       $revision->make_public();
+      if ($revision->status eq 'draft') {
+        INFO("Moving from draft to needs-review");
+        $revision->set_status('request-review');
+      }
       $revision->update();
       INFO("SUCCESS");
       return;
@@ -408,7 +368,6 @@ sub process_revision_change {
       return;
     }
   }
-
 
   my $log_message = sprintf(
     "REVISION CHANGE FOUND: D%d: %s | bug: %d | %s | %s",
@@ -425,7 +384,7 @@ sub process_revision_change {
   if ($bug->{error}
     || !$revision->author->bugzilla_user->can_see_bug($revision->bug_id))
   {
-    if ($story_text =~ /\s+created\s+D\d+/) {
+    if ($is_new) {
       INFO( 'Invalid bug ID or author does not have access to the bug. '
           . 'Waiting til next revision update to notify author.');
       return;
@@ -528,8 +487,31 @@ sub process_revision_change {
         . $attachment->id
         . " for bug "
         . $attachment->bug_id);
+    my $moved_comment
+      = "Revision D"
+      . $revision->id
+      . " was moved to bug "
+      . $bug->id
+      . ". Setting attachment "
+      . $attachment->id
+      . " to obsolete.";
     $attachment->set_is_obsolete(1);
+    $attachment->bug->add_comment(
+      $moved_comment,
+      {
+        type        => CMT_ATTACHMENT_UPDATED,
+        extra_data  => $attachment->id,
+        is_markdown => (Bugzilla->params->{use_markdown} ? 1 : 0)
+      }
+    );
+    $attachment->bug->update($timestamp);
     $attachment->update($timestamp);
+  }
+
+  # Set status to request-review if revision is new and in draft state
+  if ($is_new && $revision->status eq 'draft') {
+    INFO("Moving from draft to needs-review");
+    $revision->set_status('request-review');
   }
 
   # FINISH UP

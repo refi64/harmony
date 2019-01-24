@@ -1,4 +1,4 @@
-#!/usr/bin/perl -T
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -317,22 +317,16 @@ else {
     = formvalue('bug_severity', Bugzilla->params->{'defaultseverity'});
 
   # BMO - use per-product default hw/os
-  if (any { $_->NAME eq 'BMO' } @{Bugzilla->extensions}) {
-    $default{'rep_platform'}
-      = formvalue('rep_platform', $product->default_platform // detect_platform());
-    $default{'op_sys'}
-      = formvalue('op_sys', $product->default_op_sys // detect_op_sys());
-  }
-  else {
-    $default{'rep_platform'} = formvalue('rep_platform', detect_platform());
-    $default{'op_sys'}       = formvalue('op_sys',       detect_op_sys());
-  }
+  $default{'rep_platform'}
+    = formvalue('rep_platform', $product->default_platform // detect_platform());
+  $default{'op_sys'}
+    = formvalue('op_sys', $product->default_op_sys // detect_op_sys());
   $vars->{'rep_platform'} = detect_platform();
   $vars->{'rep_op_sys'}   = detect_op_sys();
 
   $vars->{'alias'}          = formvalue('alias');
   $vars->{'short_desc'}     = formvalue('short_desc');
-  $vars->{'bug_file_loc'}   = formvalue('bug_file_loc', "http://");
+  $vars->{'bug_file_loc'}   = formvalue('bug_file_loc');
   $vars->{'keywords'}       = formvalue('keywords');
   $vars->{'dependson'}      = formvalue('dependson');
   $vars->{'blocked'}        = formvalue('blocked');
@@ -343,7 +337,7 @@ else {
 
   $vars->{'cc'} = join(', ', $cgi->param('cc'));
 
-  $vars->{'comment'}            = formvalue('comment');
+  $vars->{'comment'}            = formvalue('comment', $product->bug_description_template);
   $vars->{'comment_is_private'} = formvalue('comment_is_private');
 
   # BMO Add support for mentors

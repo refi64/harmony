@@ -257,14 +257,14 @@ $(function() {
 
     function ccListLoading() {
         $('#cc-list').html(
-            '<img src="extensions/BugModal/web/throbber.gif" width="16" height="11"> Loading...'
+            `<img src="${BUGZILLA.config.basepath}extensions/BugModal/web/throbber.gif" width="16" height="11"> Loading...`
         );
     }
 
     function ccListUpdate() {
         bugzilla_ajax(
             {
-                url: 'rest/bug_modal/cc/' + BUGZILLA.bug_id
+                url: `${BUGZILLA.config.basepath}rest/bug_modal/cc/${BUGZILLA.bug_id}`
             },
             function(data) {
                 $('#cc-list').html(data.html);
@@ -378,7 +378,7 @@ $(function() {
     }
 
     // lightboxes
-    $('.lightbox, .comment-text .lightbox + span:first-of-type a:first-of-type')
+    $('.lightbox, .comment-text .lightbox + span:first-of-type a:first-of-type, .comment-text .lightbox + p span:first-of-type a:first-of-type')
         .click(function(event) {
             if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)
                 return;
@@ -448,7 +448,7 @@ $(function() {
     $('#action-history')
         .click(function(event) {
             event.preventDefault();
-            window.open(`show_activity.cgi?id=${BUGZILLA.bug_id}`, '_blank');
+            window.open(`${BUGZILLA.config.basepath}show_activity.cgi?id=${BUGZILLA.bug_id}`, '_blank');
         });
 
     // use scrollTo for in-page activity links
@@ -518,7 +518,7 @@ $(function() {
             // load the missing select data
             bugzilla_ajax(
                 {
-                    url: 'rest/bug_modal/edit/' + BUGZILLA.bug_id
+                    url: `${BUGZILLA.config.basepath}rest/bug_modal/edit/${BUGZILLA.bug_id}`
                 },
                 function(data) {
                     $('#mode-btn').hide();
@@ -691,7 +691,7 @@ $(function() {
 
             bugzilla_ajax(
                 {
-                    url: 'rest/bug/' + BUGZILLA.bug_id,
+                    url: `${BUGZILLA.config.basepath}rest/bug/${BUGZILLA.bug_id}`,
                     type: 'PUT',
                     data: JSON.stringify({ cc: cc_change })
                 },
@@ -858,31 +858,54 @@ $(function() {
 
             var prefix = "(In reply to " + comment_author + " from comment #" + comment_id + ")\n";
             var reply_text = "";
-            if (BUGZILLA.user.settings.quote_replies == 'quoted_reply') {
-                var text = $('#ct-' + comment_id).text();
-                reply_text = prefix + wrapReplyText(text);
-            } else if (BUGZILLA.user.settings.quote_replies == 'simply_reply') {
-                reply_text = prefix;
+
+            var quoteMarkdown = function($comment) {
+                const uid = $comment.data('comment-id');
+                bugzilla_ajax(
+                    {
+                        url: `rest/bug/comment/${uid}`,
+                    },
+                    (data) => {
+                        const quoted = data['comments'][uid]['text'].replace(/\n/g, "\n> ");
+                        reply_text = `${prefix}\n> ${quoted}`;
+                        populateNewComment();
+                    }
+                );
             }
 
-            // quoting a private comment, check the 'private' cb
-            $('#add-comment-private-cb').prop('checked',
-                $('#add-comment-private-cb:checked').length || $('#is-private-' + comment_id + ':checked').length);
+            var populateNewComment = function() {
+                // quoting a private comment, check the 'private' cb
+                $('#add-comment-private-cb').prop('checked',
+                    $('#add-comment-private-cb:checked').length || $('#is-private-' + comment_id + ':checked').length);
 
-            // remove embedded links to attachment details
-            reply_text = reply_text.replace(/(attachment\s+\d+)(\s+\[[^\[\n]+\])+/gi, '$1');
+                // remove embedded links to attachment details
+                reply_text = reply_text.replace(/(attachment\s+\d+)(\s+\[[^\[\n]+\])+/gi, '$1');
 
-            $.scrollTo($('#comment'), function() {
-                if ($('#comment').val() != reply_text) {
-                    $('#comment').val($('#comment').val() + reply_text);
+                $.scrollTo($('#comment'), function() {
+                    if ($('#comment').val() != reply_text) {
+                        $('#comment').val($('#comment').val() + reply_text);
+                    }
+
+                    if (BUGZILLA.user.settings.autosize_comments) {
+                        autosize.update($('#comment'));
+                    }
+
+                    $('#comment').trigger('input').focus();
+                });
+            }
+
+            if (BUGZILLA.user.settings.quote_replies == 'quoted_reply') {
+                var $comment = $('#ct-' + comment_id);
+                if ($comment.attr('data-ismarkdown')) {
+                    quoteMarkdown($comment);
+                } else {
+                    reply_text = prefix + wrapReplyText($comment.text());
+                    populateNewComment();
                 }
-
-                if (BUGZILLA.user.settings.autosize_comments) {
-                    autosize.update($('#comment'));
-                }
-
-                $('#comment').focus();
-            });
+            } else if (BUGZILLA.user.settings.quote_replies == 'simply_reply') {
+                reply_text = prefix;
+                populateNewComment();
+            }
         });
 
     if (BUGZILLA.user.settings.autosize_comments) {
@@ -942,7 +965,8 @@ $(function() {
     $('#vote-btn')
         .click(function(event) {
             event.preventDefault();
-            window.location.href = 'page.cgi?id=voting/user.html&bug_id=' + BUGZILLA.bug_id + '#vote_' + BUGZILLA.bug_id;
+            window.location.href = `${BUGZILLA.config.basepath}page.cgi?` +
+                                   `id=voting/user.html&bug_id=${BUGZILLA.bug_id}#vote_${BUGZILLA.bug_id}`;
         });
 
     // user-story
@@ -1088,7 +1112,8 @@ $(function() {
 
             bugzilla_ajax(
                 {
-                    url: 'rest/bug_modal/new_product/' + BUGZILLA.bug_id + '?product=' + encodeURIComponent($('#product').val())
+                    url: `${BUGZILLA.config.basepath}rest/bug_modal/new_product/${BUGZILLA.bug_id}?` +
+                         `product=${encodeURIComponent($('#product').val())}`
                 },
                 function(data) {
                     $('#product-throbber').hide();
@@ -1244,7 +1269,7 @@ $(function() {
         preview.html('');
         bugzilla_ajax(
             {
-                url: 'rest/bug/comment/render',
+                url: `${BUGZILLA.config.basepath}rest/bug/comment/render`,
                 type: 'POST',
                 data: { text: comment.val() },
                 hideError: true
@@ -1334,7 +1359,7 @@ function confirmUnsafeURL(url) {
 }
 
 function show_new_changes_indicator() {
-    const url = `rest/bug_user_last_visit/${BUGZILLA.bug_id}`;
+    const url = `${BUGZILLA.config.basepath}rest/bug_user_last_visit/${BUGZILLA.bug_id}`;
 
     // Get the last visited timestamp
     bugzilla_ajax({ url }, data => {
@@ -1424,7 +1449,7 @@ function show_new_changes_indicator() {
 if (history && history.replaceState) {
     var href = document.location.href;
     if (!href.match(/show_bug\.cgi/)) {
-        history.replaceState(null, BUGZILLA.bug_title, 'show_bug.cgi?id=' + BUGZILLA.bug_id);
+        history.replaceState(null, BUGZILLA.bug_title, `${BUGZILLA.config.basepath}show_bug.cgi?id=${BUGZILLA.bug_id}`);
         document.title = BUGZILLA.bug_title;
     }
     if (href.match(/show_bug\.cgi\?.*list_id=/)) {

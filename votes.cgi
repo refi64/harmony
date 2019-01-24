@@ -1,4 +1,4 @@
-#!/usr/bin/perl -T
+#!/usr/bin/env perl
 # -*- Mode: perl; indent-tabs-mode: nil -*-
 #
 # The contents of this file are subject to the Mozilla Public
@@ -30,8 +30,8 @@ use lib qw(. lib local/lib/perl5);
 use Bugzilla;
 use Bugzilla::Error;
 
-Bugzilla->has_extension('Voting')
-  || ThrowCodeError('extension_disabled', {name => 'Voting'});
+my $is_enabled = grep { $_->NAME eq 'Voting' } @{Bugzilla->extensions};
+$is_enabled || ThrowCodeError('extension_disabled', {name => 'Voting'});
 
 my $cgi = Bugzilla->cgi;
 my $action = $cgi->param('action') || 'show_user';

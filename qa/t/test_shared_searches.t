@@ -190,7 +190,7 @@ $sel->title_is("User Preferences");
 
 # There is no better way to identify the link
 $sel->click_ok(
-  '//a[contains(@href,"buglist.cgi?cmdtype=dorem&remaction=forget&namedcmd=Shared%20Selenium%20buglist")]',
+  '//a[contains(@href,"/buglist.cgi?cmdtype=dorem&remaction=forget&namedcmd=Shared%20Selenium%20buglist")]',
   undef, "Deleting the 'Shared Selenium buglist' search"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
@@ -235,7 +235,7 @@ ok(
   "The 'Shared Selenium buglist' is no longer available"
 );
 $sel->click_ok(
-  '//a[contains(@href,"buglist.cgi?cmdtype=dorem&remaction=forget&namedcmd=helpwanted")]',
+  '//a[contains(@href,"/buglist.cgi?cmdtype=dorem&remaction=forget&namedcmd=helpwanted")]',
   undef, "Deleting the 'helpwanted' search"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);

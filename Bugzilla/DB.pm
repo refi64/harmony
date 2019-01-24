@@ -1309,8 +1309,10 @@ sub bz_rollback_transaction {
     ThrowCodeError("not_in_transaction");
   }
   else {
-    $self->rollback();
     $self->{private_bz_transaction_count} = 0;
+
+    # the next line may fail if somehow we're connected but not in a txn
+    $self->rollback() if $self->connector->connected;
   }
 }
 
@@ -1350,7 +1352,7 @@ sub _build_connector {
   $attributes->{Callbacks} = {
     connected => sub {
       my ($dbh, $dsn) = @_;
-      INFO("$PROGRAM_NAME connected mysql $dsn");
+      TRACE("$PROGRAM_NAME connected mysql $dsn");
       ThrowCodeError('not_in_transaction') if $self && $self->bz_in_transaction;
       $class->on_dbi_connected(@_) if $class->can('on_dbi_connected');
       return;

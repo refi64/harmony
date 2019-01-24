@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -35,7 +35,7 @@ my $bug_1 = Bugzilla::Bug->create({
   keywords     => [],
   cc           => [],
   comment      => 'This is a brand new bug',
-  assigned_to  => Bugzilla->params->{'nobody_user'},
+  assigned_to  => 'nobody@mozilla.org',
 });
 ok($bug_1->id, "got a new bug");
 
@@ -54,7 +54,7 @@ my $bug_2    = Bugzilla::Bug->create({
   keywords     => [],
   cc           => [],
   comment      => "This is related to ${urlbase}show_bug.cgi?id=$bug_1_id",
-  assigned_to  => Bugzilla->params->{'nobody_user'},
+  assigned_to  => 'nobody@mozilla.org',
 });
 
 my $bug_2_id = $bug_2->id;

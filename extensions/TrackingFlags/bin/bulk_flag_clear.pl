@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -104,7 +104,7 @@ if (!$config->{update_db}) {
 
 # update bugs
 
-my $nobody = Bugzilla::User->check({name => Bugzilla->params->{'nobody_user'}});
+my $nobody = Bugzilla::User->check({name => 'nobody@mozilla.org'});
 
 # put our nobody user into all groups to avoid permissions issues
 $nobody->{groups} = [Bugzilla::Group->get_all];

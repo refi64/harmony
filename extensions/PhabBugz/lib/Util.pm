@@ -81,9 +81,14 @@ sub create_revision_attachment {
   });
 
   # Insert a comment about the new attachment into the database.
-  $bug->add_comment($revision->summary,
-    {type => CMT_ATTACHMENT_CREATED, extra_data => $attachment->id});
-
+  $bug->add_comment(
+    $revision->summary,
+    {
+      type        => CMT_ATTACHMENT_CREATED,
+      extra_data  => $attachment->id,
+      is_markdown => (Bugzilla->params->{use_markdown} ? 1 : 0)
+    }
+  );
   delete $bug->{attachments};
 
   return $attachment;
@@ -101,14 +106,12 @@ sub get_bug_role_phids {
 
   my @bug_users = ($bug->reporter);
   push(@bug_users, $bug->assigned_to)
-    if $bug->assigned_to->email != Bugzilla->params->{'nobody_user'};
+    if $bug->assigned_to->email !~ /^nobody\@mozilla\.org$/;
   push(@bug_users, $bug->qa_contact)  if $bug->qa_contact;
   push(@bug_users, @{$bug->cc_users}) if @{$bug->cc_users};
 
-  my $phab_users
-    = Bugzilla::Extension::PhabBugz::User->match({
-    ids => [map { $_->id } @bug_users]
-    });
+  my $phab_users = Bugzilla::Extension::PhabBugz::User->match(
+    {ids => [map { $_->id } @bug_users]});
 
   return [map { $_->phid } @{$phab_users}];
 }
@@ -139,10 +142,8 @@ sub get_attachment_revisions {
 
   my @revisions;
   foreach my $revision_id (@revision_ids) {
-    my $revision
-      = Bugzilla::Extension::PhabBugz::Revision->new_from_query({
-      ids => [$revision_id]
-      });
+    my $revision = Bugzilla::Extension::PhabBugz::Revision->new_from_query(
+      {ids => [$revision_id]});
     push @revisions, $revision if $revision;
   }
 

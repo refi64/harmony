@@ -55,16 +55,16 @@ function validateEnterBug(theform) {
 
     // These are checked in the reverse order that they appear on the page,
     // so that the one closest to the top of the form will be focused.
-    if (attach_data.value && YAHOO.lang.trim(attach_desc.value) == '') {
+    if (attach_data.value && attach_desc.value.trim() == '') {
         _errorFor(attach_desc, 'attach_desc');
         focus_me = attach_desc;
     }
     var check_description = status_comment_required[bug_status.value];
-    if (check_description && YAHOO.lang.trim(description.value) == '') {
+    if (check_description && description.value.trim() == '') {
         _errorFor(description, 'description');
         focus_me = description;
     }
-    if (YAHOO.lang.trim(short_desc.value) == '') {
+    if (short_desc.value.trim() == '') {
         _errorFor(short_desc);
         focus_me = short_desc;
     }
@@ -715,9 +715,10 @@ $(function() {
     var options_user = {
         appendTo: $('#main-inner'),
         forceFixPosition: true,
-        serviceUrl: 'rest/user/suggest',
+        serviceUrl: `${BUGZILLA.config.basepath}rest/user/suggest`,
         params: {
             Bugzilla_api_token: BUGZILLA.api_token,
+            fast_mode: 1
         },
         paramName: 'match',
         deferRequestBy: 250,
@@ -923,15 +924,15 @@ function show_comment_preview(bug_id) {
     Dom.removeClass('comment_preview_loading', 'bz_default_hidden');
 
     YAHOO.util.Connect.setDefaultPostHeader('application/json', true);
-    YAHOO.util.Connect.asyncRequest('POST', 'jsonrpc.cgi',
+    YAHOO.util.Connect.asyncRequest('POST', `${BUGZILLA.config.basepath}jsonrpc.cgi`,
     {
         success: function(res) {
-            data = YAHOO.lang.JSON.parse(res.responseText);
+            data = JSON.parse(res.responseText);
             if (data.error) {
                 Dom.addClass('comment_preview_loading', 'bz_default_hidden');
                 Dom.removeClass('comment_preview_error', 'bz_default_hidden');
                 Dom.get('comment_preview_error').innerHTML =
-                    YAHOO.lang.escapeHTML(data.error.message);
+                    data.error.message.htmlEncode();
             } else {
                 document.getElementById('comment_preview_text').innerHTML = data.result.html;
                 Dom.addClass('comment_preview_loading', 'bz_default_hidden');
@@ -943,10 +944,10 @@ function show_comment_preview(bug_id) {
             Dom.addClass('comment_preview_loading', 'bz_default_hidden');
             Dom.removeClass('comment_preview_error', 'bz_default_hidden');
             Dom.get('comment_preview_error').innerHTML =
-                YAHOO.lang.escapeHTML(res.responseText);
+                res.responseText.htmlEncode();
         }
     },
-    YAHOO.lang.JSON.stringify({
+    JSON.stringify({
         version: "1.1",
         method: 'Bug.render_comment',
         params: {
@@ -974,3 +975,34 @@ function show_comment_edit() {
     YAHOO.util.Dom.addClass(comment_tab, 'active_comment_tab');
     comment_tab.setAttribute('aria-selected', 'true');
 }
+
+/**
+ * Comment form keyboard shortcuts
+ */
+
+window.addEventListener('DOMContentLoaded', () => {
+  const on_mac = navigator.platform === 'MacIntel';
+  const $comment = document.querySelector('#comment');
+  const $save_button = document.querySelector('.save-btn, #commit');
+
+  if (!$comment || !$save_button) {
+    return;
+  }
+
+  $comment.addEventListener('keydown', event => {
+    const { isComposing, key, altKey, ctrlKey, metaKey, shiftKey } = event;
+    const accelKey = on_mac ? metaKey && !ctrlKey : ctrlKey;
+    const has_value = /\S/.test($comment.value);
+
+    if (isComposing) {
+      return;
+    }
+
+    // Accel + Enter = Save
+    if (has_value && key === 'Enter' && accelKey && !altKey && !shiftKey) {
+      event.preventDefault();
+      // Click the Save button to trigger the `submit` event handler
+      $save_button.click();
+    }
+  });
+}, { once: true });

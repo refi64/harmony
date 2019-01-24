@@ -62,7 +62,8 @@ $sel->selected_label_is("othercontrol_$group1_id",  "NA");
 edit_product($sel, "ready_to_die");
 $sel->go_back_ok();
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
-$sel->click_ok('//a[@href="editproducts.cgi?action=del&product=ready_to_die"]');
+$sel->click_ok(
+  '//a[contains(@href,"/editproducts.cgi?action=del&product=ready_to_die")]');
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Product 'ready_to_die'");
 $sel->click_ok("delete");
@@ -132,7 +133,7 @@ $sel->click_ok("link=Groups");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Edit Groups");
 $sel->click_ok(
-  "//a[contains(\@href, 'editgroups.cgi?action=del&group=$group2_id')]");
+  "//a[contains(\@href, '/editgroups.cgi?action=del&group=$group2_id')]");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete group");
 $sel->is_text_present_ok("This group is tied to the following products");
@@ -158,7 +159,8 @@ ok($text =~ qr/The group ready_to_die_ has been deleted/,
 edit_product($sel, "ready_to_die");
 $sel->go_back_ok();
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
-$sel->click_ok('//a[@href="editproducts.cgi?action=del&product=ready_to_die"]');
+$sel->click_ok(
+  '//a[contains(@href,"/editproducts.cgi?action=del&product=ready_to_die")]');
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Product 'ready_to_die'");
 $sel->click_ok("delete");
@@ -199,7 +201,7 @@ $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Edit Groups");
 ok(!$sel->is_text_present('ready_to_die__'), 'No ready_to_die__ group created');
 $sel->click_ok(
-  "//a[contains(\@href, 'editgroups.cgi?action=del&group=$group1_id')]");
+  "//a[contains(\@href, '/editgroups.cgi?action=del&group=$group1_id')]");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete group");
 $sel->click_ok("delete");
@@ -212,7 +214,8 @@ ok($text =~ /The group ready_to_die has been deleted/,
 edit_product($sel, "ready_to_die");
 $sel->go_back_ok();
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
-$sel->click_ok('//a[@href="editproducts.cgi?action=del&product=ready_to_die"]');
+$sel->click_ok(
+  '//a[contains(@href,"/editproducts.cgi?action=del&product=ready_to_die")]');
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Product 'ready_to_die'");
 $sel->click_ok("delete");

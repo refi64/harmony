@@ -25,8 +25,13 @@ use List::MoreUtils qw(any);
 # set an upper limit on the *unfiltered* number of bugs to process
 use constant MAX_NUMBER_BUGS => 4000;
 
-use constant DEFAULT_OWNER_PRODUCTS =>
-  ('Core', 'Firefox', 'Firefox for Android', 'Firefox for iOS', 'Toolkit',);
+use constant DEFAULT_OWNER_PRODUCTS => (
+  'Core', 'DevTools', 'External Software Affecting Firefox',
+  'Firefox',
+  'Firefox for Android',
+  'Firefox Build System',
+  'Testing', 'Toolkit', 'WebExtensions',
+);
 
 sub unconfirmed {
   my ($vars, $filter) = @_;

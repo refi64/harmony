@@ -38,7 +38,7 @@ YAHOO.bugzilla.commentTagging = {
             appendTo: $('#main-inner'),
             forceFixPosition: true,
             serviceUrl: function(query) {
-                return 'rest/bug/comment/tags/' + encodeURIComponent(query);
+                return `${BUGZILLA.config.basepath}rest/bug/comment/tags/${encodeURIComponent(query)}`;
             },
             params: {
                 Bugzilla_api_token: BUGZILLA.api_token
@@ -111,7 +111,7 @@ YAHOO.bugzilla.commentTagging = {
         var bz_ctag_error = Dom.get('bz_ctag_error');
         var tags_container = Dom.get('ct_' + comment_no);
         tags_container.parentNode.appendChild(bz_ctag_error, tags_container);
-        Dom.get('bz_ctag_error_msg').innerHTML = YAHOO.lang.escapeHTML(error);
+        Dom.get('bz_ctag_error_msg').innerHTML = error.htmlEncode();
         Dom.removeClass(bz_ctag_error, 'bz_default_hidden');
     },
 
@@ -257,7 +257,7 @@ YAHOO.bugzilla.commentTagging = {
         // add new tags
         var new_tags = new Array();
         for (var i = 0, l = add_tags.length; i < l; i++) {
-            var tag = YAHOO.lang.trim(add_tags[i]);
+            var tag = add_tags[i].trim();
             // validation
             if (tag == '')
                 continue;
@@ -309,11 +309,11 @@ YAHOO.bugzilla.commentTagging = {
     rpcRefresh : function(comment_id, comment_no, noRefreshOnError) {
         this.incPending(comment_id);
         YAHOO.util.Connect.setDefaultPostHeader('application/json', true);
-        YAHOO.util.Connect.asyncRequest('POST', 'jsonrpc.cgi',
+        YAHOO.util.Connect.asyncRequest('POST', `${BUGZILLA.config.basepath}jsonrpc.cgi`,
         {
             success: function(res) {
                 YAHOO.bugzilla.commentTagging.decPending(comment_id);
-                data = YAHOO.lang.JSON.parse(res.responseText);
+                data = JSON.parse(res.responseText);
                 if (data.error) {
                     YAHOO.bugzilla.commentTagging.handleRpcError(
                         comment_id, comment_no, data.error.message, noRefreshOnError);
@@ -330,7 +330,7 @@ YAHOO.bugzilla.commentTagging = {
                     comment_id, comment_no, res.responseText, noRefreshOnError);
             }
         },
-        YAHOO.lang.JSON.stringify({
+        JSON.stringify({
             version: "1.1",
             method: 'Bug.comments',
             params: {
@@ -345,11 +345,11 @@ YAHOO.bugzilla.commentTagging = {
     rpcUpdate : function(comment_id, comment_no, add, remove) {
         this.incPending(comment_id);
         YAHOO.util.Connect.setDefaultPostHeader('application/json', true);
-        YAHOO.util.Connect.asyncRequest('POST', 'jsonrpc.cgi',
+        YAHOO.util.Connect.asyncRequest('POST', `${BUGZILLA.config.basepath}jsonrpc.cgi`,
         {
             success: function(res) {
                 YAHOO.bugzilla.commentTagging.decPending(comment_id);
-                data = YAHOO.lang.JSON.parse(res.responseText);
+                data = JSON.parse(res.responseText);
                 if (data.error) {
                     YAHOO.bugzilla.commentTagging.handleRpcError(comment_id, comment_no, data.error.message);
                     return;
@@ -363,7 +363,7 @@ YAHOO.bugzilla.commentTagging = {
                 YAHOO.bugzilla.commentTagging.handleRpcError(comment_id, comment_no, res.responseText);
             }
         },
-        YAHOO.lang.JSON.stringify({
+        JSON.stringify({
             version: "1.1",
             method: 'Bug.update_comment_tags',
             params: {

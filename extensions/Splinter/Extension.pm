@@ -33,9 +33,9 @@ BEGIN {
 }
 
 sub _get_review_url {
-  my ($class, $bug_id, $attach_id) = @_;
+  my ($class, $bug_id, $attach_id, $use_abs_url) = @_;
   return get_review_url(Bugzilla::Bug->check({id => $bug_id, cache => 1}),
-    $attach_id);
+    $attach_id, $use_abs_url);
 }
 
 sub page_before_template {
@@ -108,6 +108,18 @@ sub page_before_template {
   }
 }
 
+sub object_end_of_create {
+  my ($self, $args) = @_;
+  my $class = $args->{class};
+
+  if ($class eq 'Bugzilla::Comment') {
+    my $comment = $args->{object};
+    if ($comment->body =~ /^Review of attachment (\d+)\s*:\n-{65}\n\n/s) {
+      $comment->set_is_markdown(0);
+      $comment->update;
+    }
+  }
+}
 
 sub bug_format_comment {
   my ($self, $args) = @_;

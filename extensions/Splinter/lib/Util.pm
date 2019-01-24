@@ -93,17 +93,18 @@ sub attachment_id_is_patch {
 }
 
 sub get_review_base {
-  my $base = Bugzilla->params->{'splinter_base'};
+  my $use_abs_url = shift // 0;
+  my $base        = Bugzilla->params->{'splinter_base'};
   $base =~ s!/$!!;
-  my $urlbase = Bugzilla->localconfig->{urlbase};
-  $urlbase =~ s!/$!! if $base =~ "^/";
-  $base = $urlbase . $base;
+  my $basepath = Bugzilla->localconfig->{$use_abs_url ? 'urlbase' : 'basepath'};
+  $basepath =~ s!/$!! if $base =~ "^/";
+  $base = $basepath . $base;
   return $base;
 }
 
 sub get_review_url {
-  my ($bug, $attach_id) = @_;
-  my $base   = get_review_base();
+  my ($bug, $attach_id, $use_abs_url) = @_;
+  my $base   = get_review_base($use_abs_url);
   my $bug_id = $bug->id;
   return
       $base

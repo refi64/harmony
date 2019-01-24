@@ -116,7 +116,8 @@ $sel->click_ok("link=Classifications");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select classification");
 $sel->click_ok(
-  '//a[@href="editclassifications.cgi?action=del&classification=ctwo"]');
+  '//a[contains(@href,"/editclassifications.cgi?action=del&classification=ctwo")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Error");
 my $error = trim($sel->get_text("error_msg"));
@@ -129,7 +130,8 @@ $sel->go_back_ok();
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select classification");
 $sel->click_ok(
-  '//a[@href="editclassifications.cgi?action=reclassify&classification=ctwo"]');
+  '//a[contains(@href,"/editclassifications.cgi?action=reclassify&classification=ctwo")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Reclassify products");
 $sel->add_selection_ok("myprodlist", "label=TestProduct");
@@ -140,7 +142,8 @@ $sel->click_ok("link=edit");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select classification");
 $sel->click_ok(
-  '//a[@href="editclassifications.cgi?action=del&classification=ctwo"]');
+  '//a[contains(@href,"/editclassifications.cgi?action=del&classification=ctwo")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete classification");
 $sel->is_text_present_ok("Do you really want to delete this classification?");

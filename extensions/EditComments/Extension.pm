@@ -21,7 +21,7 @@ use Bugzilla::Config::GroupSecurity;
 use Bugzilla::WebService::Bug;
 use Bugzilla::WebService::Util qw(filter_wants);
 
-our $VERSION = '0.01';
+our $VERSION = '1.0';
 
 ################
 # Installation #
@@ -46,6 +46,7 @@ sub db_schema_abstract_schema {
       },
       change_when => {TYPE => 'DATETIME', NOTNULL => 1},
       old_comment => {TYPE => 'LONGTEXT', NOTNULL => 1},
+      is_hidden   => {TYPE => 'BOOLEAN',  NOTNULL => 1, DEFAULT => 0},
     ],
     INDEXES => [
       longdescs_activity_comment_id_idx             => ['comment_id'],
@@ -58,6 +59,12 @@ sub db_schema_abstract_schema {
 sub install_update_db {
   my $dbh = Bugzilla->dbh;
   $dbh->bz_add_column('longdescs', 'edit_count', {TYPE => 'INT3', DEFAULT => 0});
+
+  # Add the new `is_hidden` column to the `longdescs_activity` table, which
+  # has been introduced with the extension's version 1.0, defaulting to `true`
+  # because existing admin-edited revisions may contain sensitive info
+  $dbh->bz_add_column('longdescs_activity', 'is_hidden',
+    {TYPE => 'BOOLEAN', NOTNULL => 1, DEFAULT => 1});
 }
 
 ####################
@@ -67,18 +74,11 @@ sub install_update_db {
 sub page_before_template {
   my ($self, $args) = @_;
 
-  return if $args->{'page_id'} ne 'editcomments.html';
+  return if $args->{'page_id'} ne 'comment-revisions.html';
 
   my $vars   = $args->{'vars'};
   my $user   = Bugzilla->user;
   my $params = Bugzilla->input_params;
-
-  # validate group membership
-  my $edit_comments_group = Bugzilla->params->{edit_comments_group};
-  if (!$edit_comments_group || !$user->in_group($edit_comments_group)) {
-    ThrowUserError('auth_failure',
-      {group => $edit_comments_group, action => 'view', object => 'editcomments'});
-  }
 
   my $bug_id = $params->{bug_id};
   my $bug    = Bugzilla::Bug->check($bug_id);
@@ -129,9 +129,10 @@ sub _get_activity {
   my $dbh = Bugzilla->dbh;
   my $query
     = 'SELECT longdescs_activity.comment_id AS id, profiles.userid, '
-    . $dbh->sql_date_format('longdescs_activity.change_when', '%Y.%m.%d %H:%i:%s')
+    . $dbh->sql_date_format('longdescs_activity.change_when', '%Y-%m-%d %H:%i:%s')
     . '
-                        AS time, longdescs_activity.old_comment AS old
+                        AS time, longdescs_activity.old_comment AS old,
+                        longdescs_activity.is_hidden as is_hidden
                    FROM longdescs_activity
              INNER JOIN profiles
                      ON profiles.userid = longdescs_activity.who
@@ -145,21 +146,22 @@ sub _get_activity {
   # body that the comment was before the edit, not the actual new version
   # of the comment.
   my @activity;
-  my $new_comment;
-  my $last_old_comment;
+  my $prev_rev;
   my $count = 0;
-  while (my $change_ref = $sth->fetchrow_hashref()) {
-    my %change = %$change_ref;
-    $change{'author'} = Bugzilla::User->new({id => $change{'userid'}, cache => 1});
-    if ($count == 0) {
-      $change{new} = $self->body;
-    }
-    else {
-      $change{new} = $new_comment;
-    }
-    $new_comment      = $change{old};
-    $last_old_comment = $change{old};
-    push(@activity, \%change);
+  while (my $revision = $sth->fetchrow_hashref()) {
+    my $current = $count == 0;
+    push(
+      @activity,
+      {
+        author       => Bugzilla::User->new({id => $revision->{userid}, cache => 1}),
+        created_time => $revision->{time},
+        old          => $revision->{old},
+        revised_time => $current ? undef : $prev_rev->{time},
+        new          => $current ? $self->body : $prev_rev->{old},
+        is_hidden    => $current ? 0 : $prev_rev->{is_hidden},
+      }
+    );
+    $prev_rev = $revision;
     $count++;
   }
 
@@ -170,10 +172,11 @@ sub _get_activity {
   push(
     @activity,
     {
-      author   => $self->author,
-      body     => $last_old_comment,
-      time     => $self->creation_ts,
-      original => 1
+      author       => $self->author,
+      created_time => $self->creation_ts,
+      revised_time => $prev_rev->{time},
+      new          => $prev_rev->{old},
+      is_hidden    => $prev_rev->{is_hidden},
     }
   );
 
@@ -197,9 +200,7 @@ sub object_columns {
   my ($self,  $args)    = @_;
   my ($class, $columns) = @$args{qw(class columns)};
   if ($class->isa('Bugzilla::Comment')) {
-    if (Bugzilla->dbh->bz_column_info($class->DB_TABLE, 'edit_count')) {
-      push @$columns, 'edit_count';
-    }
+    push(@$columns, 'edit_count');
   }
 }
 
@@ -210,7 +211,9 @@ sub bug_end_of_update {
   # or if editing comments is disabled
   my $user                = Bugzilla->user;
   my $edit_comments_group = Bugzilla->params->{edit_comments_group};
-  return if (!$edit_comments_group || !$user->in_group($edit_comments_group));
+  return
+    unless $user->is_insider
+    || $edit_comments_group && $user->in_group($edit_comments_group);
 
   my $bug       = $args->{bug};
   my $timestamp = $args->{timestamp};
@@ -226,10 +229,19 @@ sub bug_end_of_update {
     my ($comment_obj) = grep($_->id == $comment_id, @{$bug->comments});
     next if (!$comment_obj || ($comment_obj->is_private && !$user->is_insider));
 
+# Insiders can edit any comment while unprivileged users can only edit their own comments
+    next unless $user->is_insider || $comment_obj->author->id == $user->id;
+
     my $new_comment = $comment_obj->_check_thetext($params->{$param});
 
     my $old_comment = $comment_obj->body;
     next if $old_comment eq $new_comment;
+
+    # Insiders can hide comment revisions where needed
+    my $is_hidden
+      = (  $user->is_insider
+        && defined $params->{"edit_comment_checkbox_$comment_id"}
+        && $params->{"edit_comment_checkbox_$comment_id"} == 'on') ? 1 : 0;
 
     trick_taint($new_comment);
     $dbh->do(
@@ -242,10 +254,10 @@ sub bug_end_of_update {
     $timestamp ||= $dbh->selectrow_array("SELECT NOW()");
     $dbh->do(
       "INSERT INTO longdescs_activity "
-        . "(comment_id, who, change_when, old_comment) "
-        . "VALUES (?, ?, ?, ?)",
+        . "(comment_id, who, change_when, old_comment, is_hidden) "
+        . "VALUES (?, ?, ?, ?, ?)",
       undef,
-      ($comment_id, $user->id, $timestamp, $old_comment)
+      ($comment_id, $user->id, $timestamp, $old_comment, $is_hidden)
     );
 
     $comment_obj->{thetext} = $new_comment;
@@ -263,7 +275,7 @@ sub config_modify_panels {
     name    => 'edit_comments_group',
     type    => 's',
     choices => \&get_all_group_names,
-    default => 'admin',
+    default => 'editbugs',
     checker => \&check_group
     };
 }

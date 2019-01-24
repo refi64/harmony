@@ -1,4 +1,4 @@
-#!/usr/bin/perl -T
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -289,16 +289,18 @@ sub queue {
   my @requests = ();
   foreach my $data (@$results) {
     my $request = {
-      'id'              => $data->[0],
-      'type'            => $data->[1],
-      'status'          => $data->[2],
-      'bug_id'          => $data->[3],
-      'bug_summary'     => $data->[4],
-      'category'        => "$data->[5]: $data->[6]",
-      'attach_id'       => $data->[7],
-      'attach_summary'  => $data->[8],
-      'requester'       => ($data->[9] ? "$data->[9] <$data->[10]>" : $data->[10]),
-      'requestee'       => ($data->[11] ? "$data->[11] <$data->[12]>" : $data->[12]),
+      'id'             => $data->[0],
+      'type'           => $data->[1],
+      'status'         => $data->[2],
+      'bug_id'         => $data->[3],
+      'bug_summary'    => $data->[4],
+      'category'       => "$data->[5]: $data->[6]",
+      'attach_id'      => $data->[7],
+      'attach_summary' => $data->[8],
+      'requester'      => Bugzilla::User->new({name => $data->[10], cache => 1}),
+      'requestee'      => $data->[12]
+      ? Bugzilla::User->new({name => $data->[12], cache => 1})
+      : undef,
       'restricted'      => $data->[13] ? 1 : 0,
       'created'         => $data->[14],
       'attach_mimetype' => $data->[15],

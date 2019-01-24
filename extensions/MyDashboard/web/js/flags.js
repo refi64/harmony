@@ -11,7 +11,7 @@ $(function () {
     YUI({
         base: 'js/yui3/',
         combine: false
-    }).use("node", "datatable", "datatable-sort", "json-stringify", "escape",
+    }).use("node", "datatable", "datatable-sort",
         "datatable-datasource", "datasource-io", "datasource-jsonschema", function(Y) {
         // Common
         var counter = 0;
@@ -62,7 +62,7 @@ $(function () {
                 }
             };
 
-            var stringified = Y.JSON.stringify(json_object);
+            var stringified = JSON.stringify(json_object);
 
             Y.one('#' + type + '_loading').removeClass('bz_default_hidden');
             Y.one('#' + type + '_count_refresh').addClass('bz_default_hidden');
@@ -88,7 +88,7 @@ $(function () {
             for (var i = 0, l = data.size(); i < l; i++) {
                 ids.push(data.item(i).get('bug_id'));
             }
-            var url = 'buglist.cgi?bug_id=' + ids.join('%2C');
+            var url = `${BUGZILLA.config.basepath}buglist.cgi?bug_id=${ids.join('%2C')}`;
             window.open(url, '_blank');
         };
 
@@ -100,20 +100,19 @@ $(function () {
             if (o.data.bug_status == 'RESOLVED' || o.data.bug_status == 'VERIFIED') {
                 bug_closed = "bz_closed";
             }
-            return '<a href="show_bug.cgi?id=' + encodeURIComponent(o.data.bug_id) +
-                '" target="_blank" ' + 'title="' + Y.Escape.html(o.data.bug_status) + ' - ' +
-                Y.Escape.html(o.data.bug_summary) + '" class="' + bug_closed +
-                '">' + o.data.bug_id + '</a>';
+            return `<a href="${BUGZILLA.config.basepath}show_bug.cgi?id=${encodeURIComponent(o.data.bug_id)}" ` +
+                   `target="_blank" title="${o.data.bug_status.htmlEncode()} - ${o.data.bug_summary.htmlEncode()}" ` +
+                   `class="${bug_closed}">${o.data.bug_id}</a>`;
         };
 
         var updatedFormatter = function(o) {
-            return '<span title="' + Y.Escape.html(o.value) + '">' +
-                Y.Escape.html(o.data.updated_fancy) + '</span>';
+            return '<span title="' + o.value.htmlEncode() + '">' +
+                o.data.updated_fancy.htmlEncode() + '</span>';
         };
 
         var requesteeFormatter = function(o) {
             return o.value
-                ? Y.Escape.html(o.value)
+                ? o.value.htmlEncode()
                 : '<i>anyone</i>';
         };
 
@@ -127,18 +126,18 @@ $(function () {
                     'bug=' + encodeURIComponent(o.data.bug_id) +
                     '&attachment=' + encodeURIComponent(o.data.attach_id) +
                     '" target="_blank" title="Review this patch">' +
-                    Y.Escape.html(o.value) + '</a>';
+                    o.value.htmlEncode() + '</a>';
             }
             else {
-                return Y.Escape.html(o.value);
+                return o.value.htmlEncode();
             }
         };
 
         // Requestee
-        dataSource.requestee = new Y.DataSource.IO({ source: 'jsonrpc.cgi' });
+        dataSource.requestee = new Y.DataSource.IO({ source: `${BUGZILLA.config.basepath}jsonrpc.cgi` });
         dataSource.requestee.on('error', function(e) {
             try {
-                var response = Y.JSON.parse(e.data.responseText);
+                var response = JSON.parse(e.data.responseText);
                 if (response.error)
                     e.error.message = response.error.message;
             } catch(ex) {
@@ -184,10 +183,10 @@ $(function () {
         });
 
         // Requester
-        dataSource.requester = new Y.DataSource.IO({ source: 'jsonrpc.cgi' });
+        dataSource.requester = new Y.DataSource.IO({ source: `${BUGZILLA.config.basepath}jsonrpc.cgi` });
         dataSource.requester.on('error', function(e) {
             try {
-                var response = Y.JSON.parse(e.data.responseText);
+                var response = JSON.parse(e.data.responseText);
                 if (response.error)
                     e.error.message = response.error.message;
             } catch(ex) {

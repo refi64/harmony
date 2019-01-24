@@ -109,7 +109,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 #############
 
 # BMO - product aliases for searching
-use constant PRODUCT_ALIASES => {'Boot2Gecko' => 'Firefox OS',};
+use constant PRODUCT_ALIASES => {};
 
 # When doing searches, NULL datetimes are treated as this date.
 use constant EMPTY_DATETIME => '1970-01-01 00:00:00';
@@ -352,7 +352,7 @@ sub SPECIAL_PARSING {
     # BMO - add ability to use pronoun for triage owners
     triage_owner => \&_triage_owner_pronoun,
   };
-  foreach my $field (Bugzilla->active_custom_fields) {
+  foreach my $field (Bugzilla->active_custom_fields({skip_extensions => 1})) {
     if ($field->type == FIELD_TYPE_DATETIME) {
       $map->{$field->name} = \&_datetime_translate;
     }
@@ -736,22 +736,19 @@ sub data {
   # BMO - to avoid massive amounts of joins, if we're selecting a lot of
   # tracking flags, replace them with placeholders. the values will be
   # retrieved later and injected into the result.
-  if (Bugzilla->has_extension('TrackingFlags')) {
-    my %tf_map
-      = map { $_ => 1 } Bugzilla::Extension::TrackingFlags::Flag->get_all_names();
-    my @tf_selected = grep { exists $tf_map{$_} } @orig_fields;
+  my %tf_map = map { $_ => 1 } Bugzilla->tracking_flag_names;
+  my @tf_selected = grep { exists $tf_map{$_} } @orig_fields;
 
-    # mysql has a limit of 61 joins, and we want to avoid massive amounts of joins
-    # 30 ensures we won't hit the limit, nor generate too many joins
-    if (scalar @tf_selected > 30) {
-      foreach my $column (@tf_selected) {
-        $self->COLUMNS->{$column}->{name} = "'---'";
-      }
-      $self->{tracking_flags} = \@tf_selected;
+  # mysql has a limit of 61 joins, and we want to avoid massive amounts of joins
+  # 30 ensures we won't hit the limit, nor generate too many joins
+  if (scalar @tf_selected > 30) {
+    foreach my $column (@tf_selected) {
+      $self->COLUMNS->{$column}->{name} = "'---'";
     }
-    else {
-      $self->{tracking_flags} = [];
-    }
+    $self->{tracking_flags} = \@tf_selected;
+  }
+  else {
+    $self->{tracking_flags} = [];
   }
 
   my $start_time = [gettimeofday()];
@@ -806,7 +803,7 @@ sub data {
   $self->{data} = [map { $data{$_} } @$bug_ids];
 
   # BMO - get tracking flags values, and insert into result
-  if (Bugzilla->has_extension('TrackingFlags') && @{$self->{tracking_flags}}) {
+  if (@{$self->{tracking_flags}}) {
 
     # read values
     my $values;
@@ -1835,6 +1832,14 @@ sub _custom_search {
       ThrowCodeError('search_cp_without_op', {id => $id}) if !$current_clause;
       next;
     }
+    if ($field eq 'CP') {
+      $current_clause = pop @clause_stack;
+      ThrowCodeError('search_cp_without_op', {id => $id}) if !$current_clause;
+      next;
+    }
+
+    my $operator = $params->{"o$id"};
+    my $value    = $params->{"v$id"};
 
     my $operator = $params->{"o$id"};
     my $value    = $params->{"v$id"};

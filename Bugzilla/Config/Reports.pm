@@ -24,6 +24,6 @@ sub get_param_list {
       type    => 't',
       default => 'bugzilla-admin@mozilla.org'
     },
-    {name => 'report_secbugs_products', type => 'l', default => '[]'},
+    {name => 'report_secbugs_teams', type => 'l', default => '{}'},
   );
 }

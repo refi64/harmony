@@ -59,7 +59,7 @@ $text = trim($sel->get_text("bugzilla-body"));
 
 if ($text =~ /TempComponent/) {
   $sel->click_ok(
-    "//a[contains(\@href, 'editcomponents.cgi?action=del&product=TestProduct&component=TempComponent')]"
+    "//a[contains(\@href, '/editcomponents.cgi?action=del&product=TestProduct&component=TempComponent')]"
   );
   $sel->wait_for_page_to_load_ok(WAIT_TIME);
   $sel->title_is("Delete component 'TempComponent' from 'TestProduct' product");
@@ -161,7 +161,7 @@ $sel->title_is("Edit Product 'TestProduct'");
 $sel->click_ok("link=Edit components:");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->click_ok(
-  "//a[contains(\@href, 'editcomponents.cgi?action=del&product=TestProduct&component=TempComponent')]"
+  "//a[contains(\@href, '/editcomponents.cgi?action=del&product=TestProduct&component=TempComponent')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete component 'TempComponent' from 'TestProduct' product");
@@ -189,7 +189,7 @@ $text = trim($sel->get_text("bugzilla-body"));
 
 if ($text =~ /TempVersion/) {
   $sel->click_ok(
-    "//a[contains(\@href, 'editversions.cgi?action=del&product=TestProduct&version=TempVersion')]"
+    "//a[contains(\@href, '/editversions.cgi?action=del&product=TestProduct&version=TempVersion')]"
   );
   $sel->wait_for_page_to_load_ok(WAIT_TIME);
   $sel->title_is("Delete Version of Product 'TestProduct'");
@@ -294,7 +294,7 @@ $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select version of product 'TestProduct'");
 $text = trim($sel->get_text("bugzilla-body"));
 $sel->click_ok(
-  "//a[contains(\@href, 'editversions.cgi?action=del&product=TestProduct&version=TempVersion')]"
+  "//a[contains(\@href, '/editversions.cgi?action=del&product=TestProduct&version=TempVersion')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Version of Product 'TestProduct'");
@@ -322,7 +322,7 @@ $text = trim($sel->get_text("bugzilla-body"));
 
 if ($text =~ /TempMilestone/) {
   $sel->click_ok(
-    "//a[contains(\@href, 'editmilestones.cgi?action=del&product=TestProduct&milestone=TempMilestone')]"
+    "//a[contains(\@href, '/editmilestones.cgi?action=del&product=TestProduct&milestone=TempMilestone')]"
   );
   $sel->wait_for_page_to_load_ok(WAIT_TIME);
   $sel->title_is("Delete Milestone of Product 'TestProduct'");
@@ -422,7 +422,7 @@ $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select milestone of product 'TestProduct'");
 $text = trim($sel->get_text("bugzilla-body"));
 $sel->click_ok(
-  "//a[contains(\@href, 'editmilestones.cgi?action=del&product=TestProduct&milestone=TempMilestone')]"
+  "//a[contains(\@href, '/editmilestones.cgi?action=del&product=TestProduct&milestone=TempMilestone')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Milestone of Product 'TestProduct'");

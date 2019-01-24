@@ -44,7 +44,8 @@ if ($text =~ /(Kill me!|Kill me nicely)/) {
   my $product         = $1;
   my $escaped_product = url_quote($product);
   $sel->click_ok(
-    "//a[\@href='editproducts.cgi?action=del&product=$escaped_product']");
+    "//a[contains(\@href,'/editproducts.cgi?action=del&product=$escaped_product')]"
+  );
   $sel->wait_for_page_to_load_ok(WAIT_TIME);
   $sel->title_is("Delete Product '$product'");
   $sel->click_ok("delete");
@@ -307,7 +308,7 @@ $sel->click_ok("link=Edit milestones:");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select milestone of product 'Kill me nicely'");
 $sel->click_ok(
-  '//a[@href="editmilestones.cgi?action=del&product=Kill%20me%20nicely&milestone=pre-0.1"]'
+  '//a[contains(@href,"/editmilestones.cgi?action=del&product=Kill%20me%20nicely&milestone=pre-0.1")]'
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Milestone of Product 'Kill me nicely'");
@@ -334,7 +335,7 @@ $sel->click_ok("//a[contains(text(),'Edit\nversions:')]");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select version of product 'Kill me nicely'");
 $sel->click_ok(
-  "//a[contains(\@href, 'editversions.cgi?action=del&product=Kill%20me%20nicely&version=0.1a')]"
+  "//a[contains(\@href, '/editversions.cgi?action=del&product=Kill%20me%20nicely&version=0.1a')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Version of Product 'Kill me nicely'");
@@ -347,7 +348,7 @@ $sel->wait_for_page_to_load_ok(WAIT_TIME);
 # Delete an unused version. The action must succeed.
 
 $sel->click_ok(
-  '//a[@href="editversions.cgi?action=del&product=Kill%20me%20nicely&version=0.1"]'
+  '//a[contains(@href,"/editversions.cgi?action=del&product=Kill%20me%20nicely&version=0.1")]'
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Version of Product 'Kill me nicely'");
@@ -367,7 +368,7 @@ $sel->click_ok("link=Edit components:");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select component of product 'Kill me nicely'");
 $sel->click_ok(
-  "//a[contains(\@href, 'editcomponents.cgi?action=del&product=Kill%20me%20nicely&component=second%20comp')]"
+  "//a[contains(\@href, '/editcomponents.cgi?action=del&product=Kill%20me%20nicely&component=second%20comp')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete component 'second comp' from 'Kill me nicely' product");
@@ -403,7 +404,8 @@ $sel->click_ok("link=Products");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select product");
 $sel->click_ok(
-  "//a[\@href='editproducts.cgi?action=del&product=Kill%20me%20nicely']");
+  "//a[contains(\@href,'/editproducts.cgi?action=del&product=Kill%20me%20nicely')]"
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Product 'Kill me nicely'");
 $text = trim($sel->get_text("bugzilla-body"));

@@ -13,7 +13,7 @@ use warnings;
 
 use Bugzilla::Logging;
 
-our $VERSION = '20181010.1';
+our $VERSION = '20190123.1';
 
 use Bugzilla::Auth;
 use Bugzilla::Auth::Persist::Cookie;
@@ -127,15 +127,6 @@ sub template_inner {
 }
 
 sub extensions {
-
-  # Guard against extensions querying the extension list during initialization
-  # (through this method or has_extension).
-  # The extension list is not fully populated at that point,
-  # so the results would not be meaningful.
-  state $recursive = 0;
-  die "Recursive attempt to load/query extensions" if $recursive;
-  $recursive = 1;
-
   my $cache = request_cache;
   if (!$cache->{extensions}) {
     my $extension_packages = Bugzilla::Extension->load_all();
@@ -148,18 +139,7 @@ sub extensions {
     }
     $cache->{extensions} = \@extensions;
   }
-  $recursive = 0;
   return $cache->{extensions};
-}
-
-sub has_extension {
-  my ($class, $name) = @_;
-  my $cache = $class->request_cache;
-  if (!$cache->{extensions_hash}) {
-    my %extensions = map { $_->NAME => 1 } @{Bugzilla->extensions};
-    $cache->{extensions_hash} = \%extensions;
-  }
-  return exists $cache->{extensions_hash}{$name};
 }
 
 sub cgi {
@@ -185,13 +165,6 @@ sub input_params {
 
 sub localconfig {
   return $_[0]->process_cache->{localconfig} ||= read_localconfig();
-}
-
-sub urlbase {
-  my ($class) = @_;
-
-  # Since this could be modified, we have to return a new one every time.
-  return URI->new($class->localconfig->{urlbase});
 }
 
 sub params {
@@ -422,11 +395,12 @@ sub login {
     $class->user->update_last_seen_date();
   }
 
-  if ($type == LOGIN_REQUIRED && !$class->user->id) {
-    FATAL(
-      "Detected failure to throw login_required when login was required and user is not logged in."
-    );
-    ThrowUserError('login_required');
+  # If Mojo native app is requesting login, we need to possibly redirect
+  my $C = $Bugzilla::App::CGI::C;
+  if ($C->session->{override_login_target}) {
+    my $mojo_url = Mojo::URL->new($C->session->{override_login_target});
+    $mojo_url->query($C->session->{cgi_params});
+    $C->redirect_to($mojo_url);
   }
 
   return $class->user;
@@ -471,6 +445,12 @@ sub logout_request {
 sub job_queue {
   require Bugzilla::JobQueue;
   return request_cache->{job_queue} ||= Bugzilla::JobQueue->new();
+}
+
+sub jwt {
+  my ($class, @args) = @_;
+  require Mojo::JWT;
+  return Mojo::JWT->new(@args, secret => $class->localconfig->{jwt_secret});
 }
 
 sub dbh {
@@ -698,18 +678,24 @@ sub fields {
 
 sub active_custom_fields {
   my (undef, $params) = @_;
-  my $cache_id = 'active_custom_fields';
+  my $cache_id  = 'active_custom_fields';
+  my $can_cache = !exists $params->{bug_id};
   if ($params) {
     $cache_id .= ($params->{product} ? '_p' . $params->{product}->id : '')
       . ($params->{component} ? '_c' . $params->{component}->id : '');
     $cache_id .= ':noext' if $params->{skip_extensions};
   }
-  if (!exists request_cache->{$cache_id}) {
+  if (!$can_cache || !exists request_cache->{$cache_id}) {
     my $fields
       = Bugzilla::Field->match({custom => 1, obsolete => 0, skip_extensions => 1});
     Bugzilla::Hook::process('active_custom_fields',
       {fields => \$fields, params => $params});
-    request_cache->{$cache_id} = $fields;
+    if ($can_cache) {
+      request_cache->{$cache_id} = $fields;
+    }
+    else {
+      return @$fields;
+    }
   }
   return @{request_cache->{$cache_id}};
 }
@@ -784,7 +770,8 @@ sub elastic {
 }
 
 sub check_rate_limit {
-  my ($class, $name, $ip) = @_;
+  my ($class, $name, $ip, $throw_error) = @_;
+  $throw_error //= sub { ThrowUserError("rate_limit") };
   my $params = Bugzilla->params;
   if ($params->{rate_limit_active}) {
     my $rules = decode_json($params->{rate_limit_rules});
@@ -803,19 +790,17 @@ sub check_rate_limit {
       Bugzilla->audit(
         "[rate_limit] action=$action, ip=$ip, limit=$limit, name=$name");
       if ($action eq 'block') {
-        $Bugzilla::Quantum::CGI::C->block_ip($ip);
-        ThrowUserError("rate_limit");
+        $Bugzilla::App::CGI::C->block_ip($ip);
+        $throw_error->();
       }
     }
   }
 }
 
-sub markdown_parser {
-  require Bugzilla::Markdown::GFM;
-  require Bugzilla::Markdown::GFM::Parser;
-  return request_cache->{markdown_parser}
-    ||= Bugzilla::Markdown::GFM::Parser->new(
-    {extensions => [qw( autolink tagfilter table strikethrough)]});
+sub markdown {
+  require Bugzilla::Markdown;
+  state $markdown = Bugzilla::Markdown->new;
+  return $markdown;
 }
 
 # Private methods
@@ -1136,10 +1121,9 @@ of features, see C<OPTIONAL_MODULES> in C<Bugzilla::Install::Requirements>.
 
 Feeds the provided message into our centralised auditing system.
 
-=item C<markdown_parser>
+=item C<markdown>
 
-Returns a L<Bugzilla::Markdown::GFM::Parser> with the default extensions
-loaded (autolink, tagfilter, table, and strikethrough).
+Returns a L<Bugzilla::Markdown> object.
 
 =back
 
@@ -1218,5 +1202,12 @@ See the documentation for the C<Bugzilla::Memcached> module for more
 information.
 
 =back
+
+=item C<jwt>
+
+Returns a L<Mojo::JWT> object, configured with the Bugzilla localconfig jwt_secret set.
+
+  my $payload_hash = Bugzilla->jwt->decode($jwt);
+  my $new_jwt      = Bugzilla->jwt(claims => $payload_hash)->encode;
 
 =back

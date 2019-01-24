@@ -50,6 +50,10 @@ sub import {
   my $BugzillaStatus = mock 'Bugzilla::Status' =>
     (override => [closed_bug_statuses => sub { die "no database" },],);
 
+  # prod-like defaults
+  $answers{user_info_class}   //= 'GitHubAuth,CGI';
+  $answers{user_verify_class} //= 'GitHubAuth,DB';
+
   if ($first_time++) {
     capture_merged {
       Bugzilla::Config::update_params();

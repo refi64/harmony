@@ -282,17 +282,11 @@ sub object_columns {
   my ($self,  $args)    = @_;
   my ($class, $columns) = @$args{qw(class columns)};
   if ($class->isa('Bugzilla::Product')) {
-    my $dbh         = Bugzilla->dbh;
-    my @new_columns = qw(reviewer_required);
-    push @$columns,
-      grep { $dbh->bz_column_info($class->DB_TABLE, $_) } @new_columns;
+    push @$columns, 'reviewer_required';
   }
   elsif ($class->isa('Bugzilla::User')) {
-    my $dbh = Bugzilla->dbh;
-    my @new_columns
-      = qw(review_request_count feedback_request_count needinfo_request_count);
     push @$columns,
-      grep { $dbh->bz_column_info($class->DB_TABLE, $_) } @new_columns;
+      qw(review_request_count feedback_request_count needinfo_request_count);
   }
 }
 

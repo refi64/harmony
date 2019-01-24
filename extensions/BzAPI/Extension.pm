@@ -187,13 +187,6 @@ sub webservice_status_code_map {
   $status_code_map->{51} = STATUS_BAD_REQUEST;
 }
 
-sub psgi_builder {
-  my ($self, $args) = @_;
-  my $mount = $args->{mount};
-
-  $mount->{'bzapi'} = compile_cgi('extensions/BzAPI/bin/rest.cgi');
-}
-
 
 #####################
 # Utility Functions #

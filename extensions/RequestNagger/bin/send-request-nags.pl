@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -28,9 +28,9 @@ use Bugzilla::Mailer;
 use Bugzilla::User;
 use Bugzilla::Util qw(format_time datetime_from);
 use Email::MIME;
-use File::Slurp qw(read_file);
+use Mojo::File qw(path);
 use File::Temp qw(tempfile);
-use JSON qw(encode_json decode_json);
+use Mojo::JSON qw(encode_json decode_json);
 use Sys::Hostname qw(hostname);
 
 Bugzilla->usage_mode(USAGE_MODE_CMDLINE);
@@ -39,16 +39,15 @@ my $DO_NOT_NAG = grep { $_ eq '-d' } @ARGV;
 @ARGV = grep { !/^-/ } @ARGV;
 
 if (my $filename = shift @ARGV) {
-  _send_email(decode_json(scalar read_file($filename)));
+  _send_email(decode_json(path($filename)->slurp));
   exit;
 }
 
-my $dbh     = Bugzilla->dbh;
-my $db_date = $dbh->selectrow_array('SELECT LOCALTIMESTAMP(0)');
-my $date    = format_time($db_date, '%a, %d %b %Y %T %z', 'UTC');
+my $db_date = Bugzilla->dbh->selectrow_array('SELECT LOCALTIMESTAMP(0)');
+my $date = format_time($db_date, '%a, %d %b %Y %T %z', 'UTC');
 
 # delete expired defers
-$dbh->do("DELETE FROM nag_defer WHERE defer_until <= CURRENT_DATE()");
+Bugzilla->dbh->do("DELETE FROM nag_defer WHERE defer_until <= CURRENT_DATE()");
 Bugzilla->switch_to_shadow_db();
 
 # send nags to requestees
@@ -77,9 +76,12 @@ sub send_nags {
   # get requests
 
   foreach my $report (@{$args{reports}}) {
-
-    # collate requests
-    my $rows = $dbh->selectall_arrayref($args{$report . '_sql'}, {Slice => {}});
+    my $rows;
+    Bugzilla->dbh->connector->run(
+      fixup => sub {
+        $rows = $_->selectall_arrayref($args{$report . '_sql'}, {Slice => {}});
+      }
+    );
     foreach my $request (@$rows) {
       next unless _include_request($request, $report);
 

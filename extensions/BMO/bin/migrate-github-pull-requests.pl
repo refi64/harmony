@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -23,7 +23,7 @@ use Bugzilla::User;
 use Bugzilla::Util qw(trim);
 
 my $dbh    = Bugzilla->dbh;
-my $nobody = Bugzilla::User->check({name => Bugzilla->params->{'nobody_user'}});
+my $nobody = Bugzilla::User->check({name => 'nobody@mozilla.org'});
 my $field  = Bugzilla::Field->check({name => 'attachments.mimetype'});
 
 # grab list of suitable attachments

@@ -33,6 +33,10 @@ use URI::QueryParam;
 use Role::Tiny::With;
 
 use base qw(Bugzilla::Object Exporter);
+
+with 'Bugzilla::Elastic::Role::Object', 'Bugzilla::Role::Storable',
+  'Bugzilla::Role::FlattenToHash';
+
 @Bugzilla::User::EXPORT = qw(is_available_username
   login_to_id user_id_to_login
   USER_MATCH_MULTIPLE USER_MATCH_FAILED USER_MATCH_SUCCESS
@@ -129,8 +133,6 @@ use constant VALIDATOR_DEPENDENCIES => {
 };
 
 use constant EXTRA_REQUIRED_FIELDS => qw(is_enabled);
-
-with 'Bugzilla::Elastic::Role::Object';
 
 sub ES_INDEX {
   my ($class) = @_;
@@ -230,6 +232,7 @@ sub es_document {
 
   return $doc;
 }
+
 ################################################################################
 # Functions
 ################################################################################

@@ -159,13 +159,13 @@ sub suggest {
   }
   else {
     if ($have_mysql && ($s =~ /[[:space:]]/ || $s =~ /[^[:ascii:]]/)) {
-      my $match = sprintf 'MATCH(realname) AGAINST (%s) ', $dbh->quote($s);
+      my $match = $dbh->sql_prefix_match_fulltext('realname', $s);
       push @select, "$match AS relevance";
       $order = 'relevance DESC';
       $where = $match;
     }
     elsif ($have_mysql && $s =~ /^[[:upper:]]/) {
-      my $match = sprintf 'MATCH(realname) AGAINST (%s) ', $dbh->quote($s);
+      my $match = $dbh->sql_prefix_match_fulltext('realname', $s);
       $where = join ' OR ', $match, $dbh->sql_prefix_match(nickname => $s),
         $dbh->sql_prefix_match(login_name => $s);
     }
@@ -185,11 +185,14 @@ sub suggest {
   my @users = map { {
     id        => $self->type(int    => $_->{id}),
     real_name => $self->type(string => $_->{real_name}),
+    nick      => $self->type(string => $_->{nick}),
     name      => $self->type(email  => $_->{name}),
   } } @$results;
 
-  Bugzilla::Hook::process('webservice_user_suggest',
-    {webservice => $self, params => $params, users => \@users});
+  unless ($params->{fast_mode}) {
+    Bugzilla::Hook::process('webservice_user_suggest',
+      {webservice => $self, params => $params, users => \@users});
+  }
 
   return {users => \@users};
 }
@@ -235,6 +238,7 @@ sub get {
         {
         id        => $self->type('int',    $_->id),
         real_name => $self->type('string', $_->name),
+        nick      => $self->type('string', $_->nick),
         name      => $self->type('email',  $_->login),
         }
     } @$in_group;
@@ -292,6 +296,7 @@ sub get {
       {
       id        => $self->type('int',     $user->id),
       real_name => $self->type('string',  $user->name),
+      nick      => $self->type('string',  $user->nick),
       name      => $self->type('email',   $user->login),
       email     => $self->type('email',   $user->email),
       can_login => $self->type('boolean', $user->is_enabled ? 1 : 0),
@@ -494,6 +499,7 @@ sub whoami {
     {
       id         => $self->type('int',     $user->id),
       real_name  => $self->type('string',  $user->name),
+      nick       => $self->type('string',  $user->nick),
       name       => $self->type('email',   $user->login),
       mfa_status => $self->type('boolean', !!$user->mfa),
     }
@@ -1024,6 +1030,11 @@ Even if the user's login name changes, this will not change.
 
 C<string> The actual name of the user. May be blank.
 
+=item nick
+
+C<string> The user's nickname. Currently this is extracted from the real_name,
+name or email field.
+
 =item email
 
 C<string> The email address of the user.
@@ -1098,10 +1109,10 @@ name of each saved search.
 =back
 
 B<Note>: If you are not logged in to Bugzilla when you call this function, you
-will only be returned the C<id>, C<name>, and C<real_name> items. If you are
-logged in and not in editusers group, you will only be returned the C<id>, C<name>,
-C<real_name>, C<email>, and C<can_login> items. The groups returned are filtered
-based on your permission to bless each group.
+will only be returned the C<id>, C<name>, C<real_name> and C<nick> items. If you
+are logged in and not in editusers group, you will only be returned the C<id>,
+C<name>, C<real_name>, C<nick>, C<email> and C<can_login> items. The groups
+returned are filtered based on your permission to bless each group.
 
 =back
 
@@ -1149,6 +1160,8 @@ for C<match> has changed to only returning enabled accounts.
 =item Error 804 has been added in Bugzilla 4.0.9 and 4.2.4. It's now
 illegal to pass a group name you don't belong to.
 
+=item C<nick> Added in Bugzilla B<6.0>.
+
 =back
 
 =item REST API call added in Bugzilla B<5.0>.
@@ -1181,6 +1194,11 @@ Even if the user's login name changes, this will not change.
 =item real_name
 
 C<string> The actual name of the user. May be blank.
+
+=item nick
+
+C<string> The user's nickname. Currently this is extracted from the real_name,
+name or email field.
 
 =item name
 

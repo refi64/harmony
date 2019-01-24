@@ -35,12 +35,12 @@ use Digest::MD5 qw(md5_hex);
 use File::Basename qw(basename dirname);
 use File::Find;
 use File::Path qw(rmtree mkpath);
-use File::Slurp;
 use File::Spec;
 use IO::Dir;
 use List::MoreUtils qw(firstidx);
 use Scalar::Util qw(blessed);
-use JSON::XS qw(encode_json);
+use Mojo::JSON qw(encode_json);
+use Encode qw(encode decode);
 
 use parent qw(Template);
 
@@ -49,7 +49,8 @@ use constant FORMAT_3_SIZE => [19, 28, 28];
 use constant FORMAT_DOUBLE => '%19s %-55s';
 use constant FORMAT_2_SIZE => [19, 55];
 
-my %SHARED_PROVIDERS;
+our %SHARED_PROVIDERS;
+our $COLOR_QUOTES = 1;
 
 # Pseudo-constant.
 sub SAFE_URL_REGEXP {
@@ -216,9 +217,11 @@ sub quoteUrls {
 
   $text = html_quote($text);
 
-  # Color quoted text
-  $text =~ s~^(&gt;.+)$~<span class="quote">$1</span >~mg;
-  $text =~ s~</span >\n<span class="quote">~\n~g;
+  if ($COLOR_QUOTES) {
+    # Color quoted text
+    $text =~ s~^(&gt;.+)$~<span class="quote">$1</span >~mg;
+    $text =~ s~</span >\n<span class="quote">~\n~g;
+  }
 
   # mailto:
   # Use |<nothing> so that $1 is defined regardless
@@ -291,8 +294,8 @@ sub get_attachment_link {
 
     $link_text =~ s/ \[details\]$//;
     $link_text =~ s/ \[diff\]$//;
-    state $urlbase = Bugzilla->localconfig->{urlbase};
-    my $linkval = "${urlbase}attachment.cgi?id=$attachid";
+    state $basepath = Bugzilla->localconfig->{basepath};
+    my $linkval = "${basepath}attachment.cgi?id=$attachid";
 
     # If the attachment is a patch and patch_viewer feature is
     # enabled, add link to the diff.
@@ -382,7 +385,11 @@ sub multiline_sprintf {
 
 sub version_filter {
   my ($file_url) = @_;
-  return "static/v" . Bugzilla->VERSION . "/$file_url";
+  return
+      Bugzilla->localconfig->{basepath}
+    . "static/v"
+    . Bugzilla->VERSION
+    . "/$file_url";
 }
 
 # Set up the skin CSS cascade:
@@ -535,7 +542,11 @@ $Template::Stash::SCALAR_OPS->{lower} = sub {
 our $is_processing = 0;
 
 sub process {
-  my $self = shift;
+  my ($self, $input, $vars, $output) = @_;
+  $vars //= {};
+  if (($ENV{SERVER_SOFTWARE} // '') eq 'Bugzilla::App::CGI') {
+    $vars->{self} = $vars->{c} = $Bugzilla::App::CGI::C;
+  }
 
   # All of this current_langs stuff allows template_inner to correctly
   # determine what-language Template object it should instantiate.
@@ -545,7 +556,7 @@ sub process {
   local $SIG{__DIE__};
   delete $SIG{__DIE__};
   warn "WARNING: CGI::Carp makes templates slow" if $INC{"CGI/Carp.pm"};
-  my $retval = $self->SUPER::process(@_);
+  my $retval = $self->SUPER::process($input, $vars, $output);
   shift @$current_langs;
   return $retval;
 }
@@ -735,6 +746,22 @@ sub create {
         1
       ],
 
+      renderMarkdown => [
+        sub {
+          my ($context, $bug, $comment, $user) = @_;
+          return sub {
+            my $text = shift;
+            if ($comment && $comment->is_markdown && Bugzilla->params->{use_markdown}) {
+              return Bugzilla->markdown->render_html($text, $bug, $comment, $user);
+            }
+            else {
+              return quoteUrls($text, $bug, $comment, $user);
+            }
+          };
+        },
+        1
+      ],
+
       bug_link => [
         sub {
           my ($context, $bug, $options) = @_;
@@ -914,7 +941,11 @@ sub create {
       },
 
       json_encode => sub {
-        return encode_json($_[0]);
+        return decode('UTF-8', encode_json($_[0]), Encode::FB_DEFAULT);
+      },
+
+      md5 => sub {
+        return md5_hex($_[0]);
       },
 
       # Function to create date strings
@@ -952,6 +983,9 @@ sub create {
 
       # Allow templates to access the "corect" URLBase value
       'urlbase' => sub { return Bugzilla->localconfig->{urlbase}; },
+
+      # Allow templates to get the absolute path of the URLBase value
+      'basepath' => sub { return Bugzilla->localconfig->{basepath}; },
 
       # Allow templates to access docs url with users' preferred language
       'docs_urlbase' => sub {
@@ -1020,8 +1054,6 @@ sub create {
       },
 
       'feature_enabled' => sub { return Bugzilla->feature(@_); },
-
-      'has_extension' => sub { return Bugzilla->has_extension(@_); },
 
       # field_descs can be somewhat slow to generate, so we generate
       # it only once per-language no matter how many times

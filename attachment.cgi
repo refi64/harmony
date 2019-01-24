@@ -1,4 +1,4 @@
-#!/usr/bin/perl -T
+#!/usr/bin/env perl
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -619,9 +619,10 @@ sub insert {
   $bug->add_comment(
     $comment,
     {
-      isprivate  => $attachment->isprivate,
-      type       => CMT_ATTACHMENT_CREATED,
-      extra_data => $attachment->id
+      isprivate   => $attachment->isprivate,
+      type        => CMT_ATTACHMENT_CREATED,
+      extra_data  => $attachment->id,
+      is_markdown => Bugzilla->params->{use_markdown} ? 1 : 0,
     }
   );
 
@@ -774,13 +775,18 @@ sub update {
   # If the user submitted a comment while editing the attachment,
   # add the comment to the bug. Do this after having validated isprivate!
   my $comment = $cgi->param('comment');
+  my $is_markdown = Bugzilla->params->{use_markdown} ? 1 : 0;
+  if ($cgi->param('markdown_off')) {
+    $is_markdown = 0;
+  }
   if (defined $comment && trim($comment) ne '') {
     $bug->add_comment(
       $comment,
       {
-        isprivate  => $attachment->isprivate,
-        type       => CMT_ATTACHMENT_UPDATED,
-        extra_data => $attachment->id
+        isprivate   => $attachment->isprivate,
+        type        => CMT_ATTACHMENT_UPDATED,
+        extra_data  => $attachment->id,
+        is_markdown => $is_markdown,
       }
     );
   }

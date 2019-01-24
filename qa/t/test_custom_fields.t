@@ -360,7 +360,7 @@ $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is(
   "Select value for the 'List$bug1_id' (cf_qa_list_$bug1_id) field");
 $sel->click_ok(
-  "//a[contains(\@href, 'editvalues.cgi?action=del&field=cf_qa_list_$bug1_id&value=have%20fun%3F')]"
+  "//a[contains(\@href, '/editvalues.cgi?action=del&field=cf_qa_list_$bug1_id&value=have%20fun%3F')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is(
@@ -373,7 +373,7 @@ $sel->title_is("Field Value Deleted");
 # This value cannot be deleted as it's in use.
 
 $sel->click_ok(
-  "//a[contains(\@href, 'editvalues.cgi?action=del&field=cf_qa_list_$bug1_id&value=storage')]"
+  "//a[contains(\@href, '/editvalues.cgi?action=del&field=cf_qa_list_$bug1_id&value=storage')]"
 );
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is(
@@ -443,7 +443,8 @@ $sel->click_ok("link=Status");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select value for the 'Status' (bug_status) field");
 $sel->click_ok(
-  '//a[@href="editvalues.cgi?action=del&field=bug_status&value=SUSPENDED"]');
+  '//a[contains(@href,"/editvalues.cgi?action=del&field=bug_status&value=SUSPENDED")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Value 'SUSPENDED' from the 'Status' (bug_status) field");
 $sel->is_text_present_ok("Sorry, but the 'SUSPENDED' value cannot be deleted");
@@ -467,7 +468,8 @@ $sel->click_ok("link=Status");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select value for the 'Status' (bug_status) field");
 $sel->click_ok(
-  '//a[@href="editvalues.cgi?action=del&field=bug_status&value=SUSPENDED"]');
+  '//a[contains(@href,"/editvalues.cgi?action=del&field=bug_status&value=SUSPENDED")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Value 'SUSPENDED' from the 'Status' (bug_status) field");
 $sel->click_ok("delete");
@@ -477,7 +479,8 @@ $sel->is_text_present_ok(
   "The value SUSPENDED of the Status (bug_status) field has been deleted");
 
 $sel->click_ok(
-  '//a[@href="editvalues.cgi?action=del&field=bug_status&value=IN_QA"]');
+  '//a[contains(@href,"/editvalues.cgi?action=del&field=bug_status&value=IN_QA")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Delete Value 'IN_QA' from the 'Status' (bug_status) field");
 $sel->click_ok("delete");
@@ -494,7 +497,8 @@ $sel->click_ok("link=Resolution");
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is("Select value for the 'Resolution' (resolution) field");
 $sel->click_ok(
-  '//a[@href="editvalues.cgi?action=del&field=resolution&value=UPSTREAM"]');
+  '//a[contains(@href,"/editvalues.cgi?action=del&field=resolution&value=UPSTREAM")]'
+);
 $sel->wait_for_page_to_load_ok(WAIT_TIME);
 $sel->title_is(
   "Delete Value 'UPSTREAM' from the 'Resolution' (resolution) field");

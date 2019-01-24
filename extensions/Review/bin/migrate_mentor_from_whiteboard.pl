@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -36,7 +36,7 @@ EOF
 <>;
 
 # we need to be logged in to do user searching and update bugs
-my $nobody = Bugzilla::User->check({name => Bugzilla->params->{'nobody_user'}});
+my $nobody = Bugzilla::User->check({name => 'nobody@mozilla.org'});
 $nobody->{groups} = [Bugzilla::Group->get_all];
 Bugzilla->set_user($nobody);
 

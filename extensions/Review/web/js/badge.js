@@ -84,15 +84,14 @@ Bugzilla.Review.Badge = class Badge {
         // Show up to 20 newest requests
         requests.slice(0, 20).forEach(req => {
             const $li = document.createElement('li');
-            const [, name, email] = req.requester.match(/^(?:(.*)\s<)?(.+?)>?$/);
-            const pretty_name = name ? name.replace(/([\[\(<‹].*?[›>\)\]]|\:[\w\-]+|\s+\-\s+.*)/g, '').trim() : email;
+            const { nick, gravatar } = req.requester;
             const [link, attach_label] = this.get_link(req);
 
             $li.setAttribute('role', 'none');
             $li.innerHTML = `<a href="${link.htmlEncode()}" role="menuitem" tabindex="-1" `
                 + `class="${(req.restricted ? 'secure' : '')}" data-type="${req.type}">`
-                + `<img src="https://secure.gravatar.com/avatar/${md5(email.toLowerCase())}?d=mm&amp;size=64" alt="">`
-                + `<label><strong>${pretty_name.htmlEncode()}</strong> asked for your `
+                + `<img src="${gravatar}" alt="">`
+                + `<label><strong>${nick.htmlEncode()}</strong> asked for your `
                 + (req.type === 'needinfo' ? 'info' : req.type) + (attach_label ? ` on ${attach_label}` : '')
                 + ' in ' + (req.restricted ? '<span class="icon" aria-label="secure"></span>&nbsp;' : '')
                 + `<strong>Bug ${req.bug_id} &ndash; ${req.bug_summary.htmlEncode()}</strong>.</label>`
@@ -114,6 +113,7 @@ Bugzilla.Review.Badge = class Badge {
     get_link(req) {
         const dup = req.dup_count > 1;
         const splinter_base = BUGZILLA.param.splinter_base;
+        const basepath = BUGZILLA.config.basepath;
         const x_types = ['github-pull-request', 'review-board-request', 'phabricator-request', 'google-doc'];
         const is_patch = req.attach_ispatch;
         const [is_ghpr, is_rbr, is_phr, is_gdoc] = x_types.map(type => req.attach_mimetype === `text/x-${type}`);
@@ -122,9 +122,9 @@ Bugzilla.Review.Badge = class Badge {
 
         const link = (is_patch && !dup && splinter_base)
             ? `${splinter_base}&bug=${req.bug_id}&attachment=${req.attach_id}`
-            : (is_redirect && !dup) ? `attachment.cgi?id=${req.attach_id}` // external redirect
-                : ((is_patch || is_file) && !dup) ? `attachment.cgi?id=${req.attach_id}&action=edit`
-                    : `show_bug.cgi?id=${req.bug_id}`;
+            : (is_redirect && !dup) ? `${basepath}attachment.cgi?id=${req.attach_id}` // external redirect
+                : ((is_patch || is_file) && !dup) ? `${basepath}attachment.cgi?id=${req.attach_id}&action=edit`
+                    : `${basepath}show_bug.cgi?id=${req.bug_id}`;
 
         const attach_label = (is_patch || is_rbr || is_phr) ? (dup ? `${req.dup_count} patches` : 'a patch')
             : is_ghpr ? (dup ? `${req.dup_count} pull requests` : 'a pull request')

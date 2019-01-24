@@ -10,6 +10,16 @@ $(function() {
 
     // comment collapse/expand
 
+    const update_spinner = (spinner, expanded) => {
+        const str = spinner.data('strings');
+
+        spinner.attr({
+            'title': expanded ? str.collapse_tooltip : str.expand_tooltip,
+            'aria-label': expanded ? str.collapse_label : str.expand_label,
+            'aria-expanded': expanded,
+        });
+    };
+
     function toggleChange(spinner, forced) {
         var spinnerID = spinner.attr('id');
         var id = spinnerID.substring(spinnerID.indexOf('-') + 1);
@@ -23,24 +33,24 @@ $(function() {
                 changeSet.find(activitySelector).hide();
                 changeSet.find('.gravatar').css('width', '16px').css('height', '16px');
                 $('#ar-' + id).hide();
-                spinner.text('+');
+                update_spinner(spinner, false);
             }
             else if (forced == 'show' || forced == 'reset') {
                 changeSet.find(activitySelector).show();
                 changeSet.find('.gravatar').css('width', '32px').css('height', '32px');
                 $('#ar-' + id).show();
-                spinner.text('-');
+                update_spinner(spinner, true);
             }
             else {
                 changeSet.find(activitySelector).slideToggle('fast', function() {
                     $('#ar-' + id).toggle();
                     if (changeSet.find(activitySelector + ':visible').length) {
                         changeSet.find('.gravatar').css('width', '32px').css('height', '32px');
-                        spinner.text('-');
+                        update_spinner(spinner, true);
                     }
                     else {
                         changeSet.find('.gravatar').css('width', '16px').css('height', '16px');
-                        spinner.text('+');
+                        update_spinner(spinner, false);
                     }
                 });
             }
@@ -72,7 +82,7 @@ $(function() {
             $('#c' + id).find('.comment-tags').hide();
             $('#c' + id).find('.gravatar').css('width', '16px').css('height', '16px');
             $('#cr-' + id).hide();
-            realSpinner.text('+');
+            update_spinner(realSpinner, false);
         }
         else if (forced == 'show') {
             if (defaultCollapsed) {
@@ -87,14 +97,14 @@ $(function() {
             $('#c' + id).find('.comment-tags').show();
             $('#c' + id).find('.gravatar').css('width', '32px').css('height', '32px');
             $('#cr-' + id).show();
-            realSpinner.text('-');
+            update_spinner(realSpinner, true);
         }
         else {
             $('#ct-' + id).slideToggle('fast', function() {
                 $('#c' + id).find(activitySelector).toggle();
                 if ($('#ct-' + id + ':visible').length) {
                     $('#c' + id).find('.comment-tags').show();
-                    realSpinner.text('-');
+                    update_spinner(realSpinner, true);
                     $('#cr-' + id).show();
                     if (BUGZILLA.user.id !== 0)
                         $('#ctag-' + id).show();
@@ -106,7 +116,7 @@ $(function() {
                 }
                 else {
                     $('#c' + id).find('.comment-tags').hide();
-                    realSpinner.text('+');
+                    update_spinner(realSpinner, false);
                     $('#cr-' + id).hide();
                     if (BUGZILLA.user.id !== 0)
                         $('#ctag-' + id).hide();
@@ -159,15 +169,14 @@ $(function() {
     $('#view-toggle-cc')
         .click(function() {
             var that = $(this);
-            var item = $('.context-menu-item.hover');
             if (that.data('shown') === '1') {
                 that.data('shown', '0');
-                item.text('Show CC Changes');
+                that.text('Show CC Changes');
                 $('.cc-only').hide();
             }
             else {
                 that.data('shown', '1');
-                item.text('Hide CC Changes');
+                that.text('Hide CC Changes');
                 $('.cc-only').show();
             }
         });
@@ -175,17 +184,24 @@ $(function() {
     $('#view-toggle-treeherder')
         .click(function() {
             var that = $(this);
-            console.log(that.data('userid'));
-            var item = $('.context-menu-item.hover');
-            if (that.data('hidden') === '1') {
-                that.data('hidden', '0');
-                item.text('Hide Treeherder Comments');
-                $('.ca-' + that.data('userid')).show();
+            var userids = that.data('userids');
+            if (that.data('hidden') === '0') {
+                that.data('hidden', '1');
+                that.text('Show Treeherder Comments');
+                userids.forEach((id) => {
+                    $('.ca-' + id).each(function() {
+                        toggleChange($(this).find('.default-collapsed .change-spinner').first(), 'hide');
+                    });
+                });
             }
             else {
-                that.data('hidden', '1');
-                item.text('Show Treeherder Comments');
-                $('.ca-' + that.data('userid')).hide();
+                that.data('hidden', '0');
+                that.text('Hide Treeherder Comments');
+                userids.forEach((id) => {
+                    $('.ca-' + id).each(function() {
+                        toggleChange($(this).find('.default-collapsed .change-spinner').first(), 'show');
+                    });
+                });
             }
         });
 
@@ -287,7 +303,7 @@ $(function() {
         // update bugzilla
         bugzilla_ajax(
             {
-                url: 'rest/bug/comment/' + commentID + '/tags',
+                url: `${BUGZILLA.config.basepath}rest/bug/comment/${commentID}/tags`,
                 type: 'PUT',
                 data: { remove: [ tag ] },
                 hideError: true
@@ -332,7 +348,7 @@ $(function() {
         cancelRefresh();
         refreshXHR = bugzilla_ajax(
             {
-                url: 'rest/bug/comment/' + commentID + '?include_fields=tags',
+                url: `${BUGZILLA.config.basepath}rest/bug/comment/${commentID}?include_fields=tags`,
                 hideError: true
             },
             function(data) {
@@ -358,7 +374,7 @@ $(function() {
             appendTo: $('#main-inner'),
             forceFixPosition: true,
             serviceUrl: function(query) {
-                return 'rest/bug/comment/tags/' + encodeURIComponent(query);
+                return `${BUGZILLA.config.basepath}rest/bug/comment/tags/${encodeURIComponent(query)}`;
             },
             params: {
                 Bugzilla_api_token: (BUGZILLA.api_token ? BUGZILLA.api_token : '')
@@ -432,7 +448,7 @@ $(function() {
                 // update bugzilla
                 bugzilla_ajax(
                     {
-                        url: 'rest/bug/comment/' + commentID + '/tags',
+                        url: `${BUGZILLA.config.basepath}rest/bug/comment/${commentID}/tags`,
                         type: 'PUT',
                         data: { add: addTags },
                         hideError: true
