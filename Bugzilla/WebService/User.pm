@@ -24,7 +24,6 @@ use Bugzilla::WebService::Util qw(filter filter_wants validate
 use Bugzilla::Hook;
 
 use List::Util qw(first);
-use Taint::Util qw(untaint);
 
 # Don't need auth to login
 use constant LOGIN_EXEMPT => {login => 1, offer_account_by_email => 1,};
@@ -140,14 +139,13 @@ sub suggest {
 
   ThrowUserError('user_access_by_match_denied') unless Bugzilla->user->id;
 
-  untaint($params->{match});
   my $s = $params->{match};
   trim($s);
   return {users => []} if length($s) < 3;
 
   my $dbh    = Bugzilla->dbh;
   my @select = ('userid AS id', 'realname AS real_name', 'login_name AS name');
-  my $order  = 'last_seen_date DESC';
+  my $order  = 'last_activity_ts DESC';
   my $where;
   state $have_mysql = $dbh->isa('Bugzilla::DB::Mysql');
 

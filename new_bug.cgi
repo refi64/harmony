@@ -58,6 +58,7 @@ if (lc($cgi->request_method) eq 'post') {
     short_desc   => scalar($cgi->param('short_desc')),
     product      => scalar($cgi->param('product')),
     component    => scalar($cgi->param('component')),
+    bug_type     => scalar($cgi->param('bug_type')),
     bug_severity => 'normal',
     groups       => \@groups,
     op_sys       => 'Unspecified',
@@ -123,8 +124,7 @@ if (lc($cgi->request_method) eq 'post') {
     push(@all_mail_results, $ref_sent);
   }
 
-  print $cgi->redirect(
-    Bugzilla->localconfig->{urlbase} . 'show_bug.cgi?id=' . $new_bug->bug_id);
+  $cgi->base_redirect('show_bug.cgi?id=' . $new_bug->bug_id);
 }
 else {
   print $cgi->header();

@@ -70,8 +70,7 @@ sub valid_values {
   my $second_id  = $second_bug->{id};
   my $comment_id = $public_bug->{comment}->{id};
   my $bug_uri
-    = $config->{browser_url} . '/'
-    . $config->{bugzilla_installation}
+    = $config->{browser_url}
     . '/show_bug.cgi?id=';
 
   my %values = (
@@ -400,7 +399,7 @@ sub invalid_values {
       },
       {
         value => {add => [$public_id]},
-        error => 'block itself or depend on itself',
+        error => 'block itself, depend on itself',
         test  => "can't add this bug itself in a dep field"
       },
 

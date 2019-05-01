@@ -42,7 +42,7 @@ var selected_components = [
   title = "Unconfirmed Reports"
   generate_api_token = 1
   javascript = js_data
-  javascript_urls = [ "js/util.js", "js/field.js", "js/productform.js",
+  javascript_urls = [ "js/field.js", "js/productform.js",
                       "extensions/BMO/web/js/triage_reports.js" ]
   style_urls = [ "skins/standard/buglist.css",
                  "extensions/BMO/web/styles/triage_reports.css" ]
@@ -161,7 +161,7 @@ Show UNCONFIRMED [% terms.bugs %] with:
       <tr class="bz_bugitem [% count % 2 == 1 ? "bz_row_odd" : "bz_row_even" %]">
         <td>
           [% bug.id FILTER bug_link(bug.id) FILTER none %]<br>
-          [% bug.creation_ts.replace(' .*' '') FILTER html FILTER no_break %]
+          <time>[% bug.creation_ts.replace(' .*' '') FILTER html %]</time>
         </td>
         <td>
           [% bug.summary FILTER html %]
@@ -173,7 +173,7 @@ Show UNCONFIRMED [% terms.bugs %] with:
           [% END %]
         </td>
         <td>
-          [% bug.comment_ts FILTER html FILTER no_break %]
+          <time>[% bug.comment_ts FILTER html %]</time>
         </td>
         <td>
           [% bug.comment FILTER html %]

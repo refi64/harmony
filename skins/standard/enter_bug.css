@@ -39,7 +39,7 @@
  * pretty well on all browsers except IE 8.
  */
 #Create #field_container_component { width: 1px; }
-#Create #field_container_reporter  { width: 100%; }
+#Create #required_marker           { width: 100%; }
 
 #Create .comment {
     vertical-align: top;
@@ -53,6 +53,15 @@
 }
 #Create #os_guess_note div {
     max-width: 35em;
+}
+
+/* Adjust style for fields using radio-button-like UI */
+#Create .field_label.for-buttons {
+    vertical-align: middle;
+}
+
+#Create .field_value.contains-buttons {
+    padding: .5em .25em;
 }
 
 /* Text inputs need to be a little shorter on enter_bug

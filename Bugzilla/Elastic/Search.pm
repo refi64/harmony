@@ -10,7 +10,6 @@ use 5.10.1;
 use Moo;
 use Bugzilla::Search;
 use Bugzilla::Search::Quicksearch;
-use Bugzilla::Util qw(trick_taint);
 use namespace::clean;
 
 use Bugzilla::Elastic::Search::FakeCGI;
@@ -35,7 +34,7 @@ with 'Bugzilla::Elastic::Role::HasClient';
 with 'Bugzilla::Elastic::Role::Search';
 
 my @SUPPORTED_FIELDS = qw(
-  bug_id product component short_desc
+  bug_id bug_type product component short_desc
   priority status_whiteboard bug_status resolution
   keywords alias assigned_to reporter delta_ts
   longdesc cf_crash_signature classification bug_severity
@@ -46,6 +45,7 @@ my %IS_SUPPORTED_FIELD = map { $_ => 1 } @SUPPORTED_FIELDS;
 $IS_SUPPORTED_FIELD{relevance} = 1;
 
 my @NORMAL_FIELDS = qw(
+  bug_type
   priority
   bug_severity
   bug_status
@@ -104,9 +104,7 @@ sub data {
     $source->{relevance} = $hit->{_score};
     foreach my $val (values %$source) {
       next unless defined $val;
-      trick_taint($val);
     }
-    trick_taint($hit->{_id});
     if ($source) {
       $hits{$hit->{_id}} = [@$source{@fields}];
     }

@@ -71,7 +71,7 @@ if ($action ne 'view'
   && (($action !~ /^(?:interdiff|diff)$/) || $format ne 'raw'))
 {
   do_ssl_redirect_if_required();
-  if ($cgi->url_is_attachment_base) {
+  if ($C->url_is_attachment_base) {
     $cgi->redirect_to_urlbase;
   }
   Bugzilla->login();
@@ -244,7 +244,7 @@ sub get_attachment {
     my $path = 'attachment.cgi?' . join('&', @args);
 
     # Make sure the attachment is served from the correct server.
-    if ($cgi->url_is_attachment_base($bug_id)) {
+    if ($C->url_is_attachment_base($bug_id)) {
 
       # No need to validate the token for public attachments. We cannot request
       # credentials as we are on the alternate host.
@@ -266,8 +266,7 @@ sub get_attachment {
         unless ($userid && $valid_token) {
 
           # Not a valid token.
-          print $cgi->redirect('-location' => Bugzilla->localconfig->{urlbase} . $path);
-          exit;
+          $cgi->base_redirect($path);
         }
 
         # Change current user without creating cookies.
@@ -277,7 +276,7 @@ sub get_attachment {
         delete_token($token);
       }
     }
-    elsif ($cgi->url_is_attachment_base) {
+    elsif ($C->url_is_attachment_base) {
 
       # If we come here, this means that each bug has its own host
       # for attachments, and that we are trying to view one attachment
@@ -389,12 +388,10 @@ sub view {
     {do_redirect => \$do_redirect});
 
   if ($do_redirect) {
-    my $uri = URI->new(Bugzilla->localconfig->{urlbase} . 'attachment.cgi');
+    my $uri = URI->new('attachment.cgi');
     $uri->query_param(id => $attachment->id);
     $uri->query_param(content_type => $contenttype) if $contenttype_override;
-
-    print $cgi->redirect('-location' => $uri);
-    exit 0;
+    $cgi->base_redirect($uri->as_string);
   }
 
   # Don't send a charset header with attachments--they might not be UTF-8.
@@ -672,7 +669,7 @@ sub insert {
   Bugzilla::Hook::process('show_bug_format', $show_bug_format);
 
   if ($show_bug_format->{format} eq 'modal') {
-    $cgi->content_security_policy(Bugzilla::CGI::SHOW_BUG_MODAL_CSP($bugid));
+    $C->content_security_policy(SHOW_BUG_MODAL_CSP($bugid));
   }
 
   print $cgi->header();
@@ -854,7 +851,7 @@ sub update {
   Bugzilla::Hook::process('show_bug_format', $show_bug_format);
 
   if ($show_bug_format->{format} eq 'modal') {
-    $cgi->content_security_policy(Bugzilla::CGI::SHOW_BUG_MODAL_CSP($bug->id));
+    $C->content_security_policy(SHOW_BUG_MODAL_CSP($bug->id));
   }
 
   print $cgi->header();
@@ -928,7 +925,7 @@ sub delete_attachment {
     Bugzilla::Hook::process('show_bug_format', $show_bug_format);
 
     if ($show_bug_format->{format} eq 'modal') {
-      $cgi->content_security_policy(Bugzilla::CGI::SHOW_BUG_MODAL_CSP($bug->id));
+      $C->content_security_policy(SHOW_BUG_MODAL_CSP($bug->id));
     }
 
     print $cgi->header();

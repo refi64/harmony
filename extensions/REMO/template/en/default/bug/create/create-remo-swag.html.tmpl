@@ -13,8 +13,7 @@
    generate_api_token = 1
    javascript_urls = [ 'extensions/REMO/web/js/swag.js',
                        'extensions/REMO/web/js/form_validate.js',
-                       'js/field.js',
-                       'js/util.js' ]
+                       'js/field.js' ]
    style_urls = [ "extensions/REMO/web/styles/moz_reps.css" ]
 %]
 
@@ -72,6 +71,7 @@ function validateAndSubmit() {
       onSubmit="return validateAndSubmit();">
 
   <input type="hidden" name="format" value="remo-swag">
+  <input type="hidden" name="bug_type" value="task">
   <input type="hidden" name="product" value="Mozilla Reps">
   <input type="hidden" name="component" value="Swag Requests">
   <input type="hidden" name="rep_platform" value="All">

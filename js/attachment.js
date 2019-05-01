@@ -301,6 +301,7 @@ Bugzilla.AttachmentForm = class AttachmentForm {
     this.$filename = document.querySelector('#att-filename');
     this.$dropbox = document.querySelector('#att-dropbox');
     this.$browse_label = document.querySelector('#att-browse-label');
+    this.$capture_label = document.querySelector('#att-capture-label');
     this.$textarea = document.querySelector('#att-textarea');
     this.$preview = document.querySelector('#att-preview');
     this.$preview_name = this.$preview.querySelector('[itemprop="name"]');
@@ -311,6 +312,7 @@ Bugzilla.AttachmentForm = class AttachmentForm {
     this.$description = document.querySelector('#att-description');
     this.$error_message = document.querySelector('#att-error-message');
     this.$ispatch = document.querySelector('#att-ispatch');
+    this.$hide_preview = document.querySelector('#att-hide-preview');
     this.$type_outer = document.querySelector('#att-type-outer');
     this.$type_list = document.querySelector('#att-type-list');
     this.$type_manual = document.querySelector('#att-type-manual');
@@ -326,12 +328,14 @@ Bugzilla.AttachmentForm = class AttachmentForm {
     this.$dropbox.addEventListener('dragend', () => this.dropbox_ondragend());
     this.$dropbox.addEventListener('drop', event => this.dropbox_ondrop(event));
     this.$browse_label.addEventListener('click', () => this.$file.click());
+    this.$capture_label.addEventListener('click', () => this.capture_onclick());
     this.$textarea.addEventListener('input', () => this.textarea_oninput());
     this.$textarea.addEventListener('paste', event => this.textarea_onpaste(event));
     this.$remove_button.addEventListener('click', () => this.remove_button_onclick());
     this.$description.addEventListener('input', () => this.description_oninput());
     this.$description.addEventListener('change', () => this.description_onchange());
     this.$ispatch.addEventListener('change', () => this.ispatch_onchange());
+    this.$hide_preview.addEventListener('change', () => this.hide_preview_onchange());
     this.$type_select.addEventListener('change', () => this.type_select_onchange());
     this.$type_input.addEventListener('change', () => this.type_input_onchange());
 
@@ -562,6 +566,50 @@ Bugzilla.AttachmentForm = class AttachmentForm {
   }
 
   /**
+   * Called whenever the Take a Screenshot button is clicked. Capture a screen, window or browser tab if the Screen
+   * Capture API is supported, then attach it as a PNG image.
+   * @see https://developer.mozilla.org/en-US/docs/Web/API/Screen_Capture_API
+   */
+  capture_onclick() {
+    if (typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+      alert('This function requires the most recent browser version such as Firefox 66 or Chrome 72.');
+      return;
+    }
+
+    const $video = document.createElement('video');
+    const $canvas = document.createElement('canvas');
+
+    navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'window' } }).then(stream => {
+      // Render a captured screenshot on `<video>`
+      $video.srcObject = stream;
+
+      return $video.play();
+    }).then(() => {
+      const width = $canvas.width = $video.videoWidth;
+      const height = $canvas.height = $video.videoHeight;
+
+      // Draw a video frame on `<canvas>`
+      $canvas.getContext('2d').drawImage($video, 0, 0, width, height);
+
+      // Clean up `<video>`
+      $video.pause();
+      $video.srcObject.getTracks().forEach(track => track.stop());
+      $video.srcObject = null;
+
+      // Convert to PNG
+      return new Promise(resolve => $canvas.toBlob(blob => resolve(blob)));
+    }).then(blob => {
+      const [date, time] = (new Date()).toISOString().match(/^(.+)T(.+)\./).splice(1);
+      const file = new File([blob], `Screenshot on ${date} at ${time}.png`, { type: 'image/png' });
+
+      this.process_file(file);
+      this.update_ispatch(false, true);
+    }).catch(() => {
+      alert('Unable to capture a screenshot.');
+    });
+  }
+
+  /**
    * Called whenever the content of the textarea is updated. Update the Content Type, `required` property, etc.
    */
   textarea_oninput() {
@@ -602,7 +650,7 @@ Bugzilla.AttachmentForm = class AttachmentForm {
 
   /**
    * Show the preview of a user-selected file. Display a thumbnail if it's a regular image (PNG, GIF, JPEG, etc.) or
-   * small plaintext file.
+   * small plaintext file. Don't show the preview of SVG image because it can be a crash test.
    * @param {File} file A file to be previewed.
    * @param {Boolean} [is_text=false] `true` if the file is a plaintext file, `false` otherwise.
    */
@@ -610,7 +658,7 @@ Bugzilla.AttachmentForm = class AttachmentForm {
     this.$preview_name.textContent = file.name;
     this.$preview_type.content = file.type;
     this.$preview_text.textContent = '';
-    this.$preview_image.src = file.type.match(/^image\/(?!vnd)/) ? URL.createObjectURL(file) : '';
+    this.$preview_image.src = file.type.match(/^image\/(?!vnd|svg)/) ? URL.createObjectURL(file) : '';
     this.$preview.hidden = false;
 
     if (is_text && file.size < 500000) {
@@ -706,6 +754,23 @@ Bugzilla.AttachmentForm = class AttachmentForm {
     // Reassign the bug to the user if the attachment is a patch or GitHub Pull Request
     if (this.$takebug && this.$takebug.clientHeight > 0 && this.$takebug.dataset.takeIfPatch) {
       this.$takebug.checked = is_patch || is_ghpr;
+    }
+  }
+
+  /**
+   * Called whenever the "hide preview" checkbox is checked or unchecked. Change the Content Type to binary if checked
+   * so the file will always be downloaded.
+   */
+  hide_preview_onchange() {
+    const hide_preview = this.$hide_preview.checked;
+
+    this.$type_outer.querySelectorAll('[name]').forEach($input => $input.disabled = hide_preview);
+
+    if (hide_preview) {
+      this.original_type = this.$type_input.value || this.$type_select.value;
+      this.update_content_type('application/octet-stream');
+    } else if (this.original_type) {
+      this.update_content_type(this.original_type);
     }
   }
 

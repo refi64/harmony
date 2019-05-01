@@ -34,7 +34,7 @@
   style_urls = [ 'skins/standard/attachment.css',
                  'skins/standard/enter_bug.css',
                  'skins/standard/create_bug.css' ]
-  javascript_urls = [ "js/attachment.js", "js/util.js",
+  javascript_urls = [ "js/attachment.js",
                       "js/field.js", "js/TUI.js", "js/bug.js",
                       "js/create_bug.js" ]
   onload = "init();"
@@ -51,6 +51,10 @@ function init() {
   initCrashSignatureField();
   init_take_handler('[% user.login FILTER js %]');
   bz_attachment_form.update_requirements(false);
+
+  document.querySelector('#bug_type').addEventListener('change', () => {
+    bug_type_specified = true;
+  }, { once: true });
 }
 
 function initCrashSignatureField() {
@@ -64,8 +68,12 @@ function initCrashSignatureField() {
   [% END %]
 }
 
+const params = new URLSearchParams(location.search);
+let bug_type_specified = params.has('bug_type') || params.has('cloned_bug_id');
+
 var initialowners = new Array([% product.components.size %]);
 var last_initialowner;
+var default_bug_types = new Array([% product.components.size %]);
 var initialccs = new Array([% product.components.size %]);
 var components = new Array([% product.components.size %]);
 var comp_desc = new Array([% product.components.size %]);
@@ -80,6 +88,7 @@ var flags = new Array([% product.components.size %]);
     components[[% count %]] = "[% c.name FILTER js %]";
     comp_desc[[% count %]] = "[% c.description FILTER html_light FILTER js %]";
     initialowners[[% count %]] = "[% c.default_assignee.login FILTER js %]";
+    default_bug_types[[% count %]] = "[% c.default_bug_type FILTER js %]";
     [% flag_list = [] %]
     [% FOREACH f = c.flag_types.bug %]
       [% flag_list.push(f.id) %]
@@ -127,6 +136,10 @@ function set_assign_to() {
             || assigned_to == '') {
             form.assigned_to.value = owner;
             last_initialowner = owner;
+        }
+
+        if (!bug_type_specified) {
+          form.bug_type.value = default_bug_types[index];
         }
 
         document.getElementById('initial_cc').innerHTML = initialccs[index];
@@ -221,19 +234,17 @@ TUI_hide_default('expert_fields');
                                    'bz_default_hidden');
       </script>
     </td>
-    <td colspan="2">
-      (<span class="required_star">*</span> =
-      <span class="required_explanation">Required Field</span>)
-   </td>
+    <td colspan="2">&nbsp;</td>
   </tr>
 
   <tr>
     [% INCLUDE bug/field.html.tmpl
       bug = default, field = bug_fields.product, editable = 0,
       value = product.name %]
-    [% INCLUDE bug/field.html.tmpl
-      bug = default, field = bug_fields.reporter, editable = 0,
-      value = user.login %]
+    <td colspan="2" id="required_marker">
+      (<span class="required_star">*</span> =
+      <span class="required_explanation">Required Field</span>)
+    </td>
   </tr>
 
   [%# We can't use the select block in these two cases for various reasons. %]
@@ -315,8 +326,8 @@ TUI_hide_default('expert_fields');
     </td>
 
     [% INCLUDE bug/field.html.tmpl
-      bug = default, field = bug_fields.bug_severity, editable = 1,
-      value = default.bug_severity %]
+      bug = default, field = bug_fields.bug_type, editable = 1, use_buttons = 1,
+      value = default.bug_type %]
   </tr>
 
   [% needs_extra_tr = 1 %]
@@ -377,18 +388,15 @@ TUI_hide_default('expert_fields');
       <td colspan="2">&nbsp;</td>
     [% END %]
   </tr>
-</tbody>
-
-<tbody class="expert_fields">
-  <tr>
-    <td colspan="4">&nbsp;</td>
-  </tr>
 
   <tr>
     [% INCLUDE bug/field.html.tmpl
       bug = default, field = bug_fields.bug_status,
       editable = (bug_status.size > 1), value = default.bug_status
       override_legal_values = bug_status %]
+    [% INCLUDE bug/field.html.tmpl
+      bug = default, field = bug_fields.bug_severity, editable = 1,
+      value = default.bug_severity %]
   </tr>
 
   <tr>
@@ -607,6 +615,21 @@ TUI_hide_default('expert_fields');
         <input name="blocked" accesskey="b" value="[% blocked FILTER html %]" size="30">
       </td>
     </tr>
+
+    [% IF Param('use_regression_fields') %]
+      <tr>
+        [% INCLUDE "bug/field-label.html.tmpl"
+          field = bug_fields.regressed_by
+          editable = 1
+        %]
+        <td>
+          <input name="regressed_by" value="[% regressed_by FILTER html %]" size="30">
+        </td>
+        <td colspan="2">
+          [%~# Regressions field is hidden from new bugs ~%]
+        </td>
+      </tr>
+    [% END %]
 
     [% IF use_keywords %]
       <tr>

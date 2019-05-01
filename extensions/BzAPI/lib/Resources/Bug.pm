@@ -14,7 +14,7 @@ use warnings;
 use Bugzilla::Bug;
 use Bugzilla::Error;
 use Bugzilla::Token qw(issue_hash_token);
-use Bugzilla::Util qw(trick_taint diff_arrays);
+use Bugzilla::Util qw(diff_arrays);
 use Bugzilla::WebService::Constants;
 
 use Bugzilla::Extension::BzAPI::Util;
@@ -145,13 +145,13 @@ sub get_bug_count_resource {
 
   # Validate the values in the axis fields or throw an error.
   !$row_field
-    || ($valid_columns->{$row_field} && trick_taint($row_field))
+    || $valid_columns->{$row_field}
     || ThrowCodeError("report_axis_invalid", {fld => "x", val => $row_field});
   !$col_field
-    || ($valid_columns->{$col_field} && trick_taint($col_field))
+    || $valid_columns->{$col_field}
     || ThrowCodeError("report_axis_invalid", {fld => "y", val => $col_field});
   !$tbl_field
-    || ($valid_columns->{$tbl_field} && trick_taint($tbl_field))
+    || $valid_columns->{$tbl_field}
     || ThrowCodeError("report_axis_invalid", {fld => "z", val => $tbl_field});
 
   my @axis_fields = grep {$_} ($row_field, $col_field, $tbl_field);
@@ -446,10 +446,10 @@ sub update_bug_request {
     }
   }
 
-  # Other fields such as keywords, blocks depends_on
+  # Other fields such as dependencies, regressions and keywords
   # support 'set' which will make the list exactly what
   # the user passes in.
-  foreach my $field (qw(blocks depends_on dependson keywords)) {
+  foreach my $field (qw(blocks depends_on dependson regresses regressed_by keywords)) {
     if (exists $params->{$field}) {
       $params->{$field} = {set => $params->{$field}};
     }

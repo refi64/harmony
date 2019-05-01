@@ -48,6 +48,8 @@ my %requires = (
   'Class::XSAccessor'                   => '1.18',
   'DBI'                                 => '1.614',
   'DBIx::Connector'                     => 0,
+  'DBIx::Class'                         => 0,
+  'DBIx::Class::Helpers'                => 0,
   'Data::Password::passwdqc'            => '0.08',
   'Date::Format'                        => '2.23',
   'DateTime'                            => '0.75',
@@ -63,6 +65,7 @@ my %requires = (
   'IO::Async'                           => '0.71',
   'IPC::System::Simple'                 => 0,
   'JSON::MaybeXS'                       => '1.003008',
+  'JSON::Validator'                     => '3.05',
   'JSON::XS'                            => '2.01',
   'LWP::Protocol::https'                => '6.07',
   'LWP::UserAgent'                      => '6.26',
@@ -87,7 +90,6 @@ my %requires = (
   'Scope::Guard'                        => '0.21',
   'Sereal'                              => '4.004',
   'Sub::Quote'                          => '2.005000',
-  'Taint::Util'                         => '0.08',
   'Template'                            => '2.24',
   'Text::CSV_XS'                        => '1.26',
   'Throwable'                           => '0.200013',
@@ -98,18 +100,6 @@ my %requires = (
 );
 
 my %build_requires = ('ExtUtils::MakeMaker' => '7.22',);
-my %test_requires = (
-  'Capture::Tiny'                   => 0,
-  'DBD::SQLite'                     => '1.29',
-  'Perl::Critic::Freenode'          => 0,
-  'Perl::Tidy'                      => '20180220',
-  'Pod::Coverage'                   => 0,
-  'Test::More'                      => 0,
-  'Test::Perl::Critic::Progressive' => 0,
-  'Test::Selenium::Firefox'         => 0,
-  'Test::WWW::Selenium'             => 0,
-  'Test2::V0'                       => 0,
-);
 my %recommends = (Safe => '2.30',);
 
 # Windows requires some additional modules.
@@ -245,11 +235,11 @@ my %optional_features = (
   },
   sqlite => {
     description => 'SQLite database support',
-    prereqs     => {runtime => {requires => {'DBD::SQLite' => '1.29'}}},
+    prereqs     => {runtime => {requires => {'DBD::SQLite' => '1.29', 'DateTime::Format::SQLite' => '0.11'}}},
   },
   mysql => {
     description => 'MySQL database support',
-    prereqs     => {runtime => {requires => {'DBD::mysql' => '4.037'}}}
+    prereqs     => {runtime => {requires => {'DBD::mysql' => '4.037', 'DateTime::Format::MySQL' => '0.06'}}}
   },
   jsonrpc => {
     description => 'JSON-RPC Interface',
@@ -367,6 +357,21 @@ for my $file (glob 'extensions/*/Config.pm') {
     }
   }
 }
+
+my %test_requires = (
+  %{ $optional_features{sqlite}{prereqs}{runtime}{requires} },
+  'Capture::Tiny'                   => 0,
+  'DBD::SQLite'                     => '1.29',
+  'Perl::Critic::Freenode'          => 0,
+  'Perl::Tidy'                      => '20180220',
+  'Pod::Coverage'                   => 0,
+  'Test::More'                      => 0,
+  'Test::Perl::Critic::Progressive' => 0,
+  'Test::Selenium::Firefox'         => 0,
+  'Selenium::Remote::Driver'        => 1.31,
+  'Test::WWW::Selenium'             => 0,
+  'Test2::V0'                       => 0,
+);
 
 # BMO Customization
 my @bmo_features = grep { is_bmo_feature($_) } keys %optional_features;

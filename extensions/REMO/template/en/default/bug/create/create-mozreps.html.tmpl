@@ -24,7 +24,7 @@
    generate_api_token = 1
    style_urls         = [ "extensions/REMO/web/styles/moz_reps.css" ]
    jquery             = []
-   javascript_urls    = [ "extensions/REMO/web/js/moz_reps.js", "js/field.js", "js/util.js"]
+   javascript_urls    = [ "extensions/REMO/web/js/moz_reps.js", "js/field.js" ]
 %]
 
 <noscript>
@@ -39,6 +39,7 @@
 </p>
 
 <form method="post" action="[% basepath FILTER none %]post_bug.cgi" id="tmRequestForm">
+  <input type="hidden" name="bug_type" value="task">
   <input type="hidden" name="product" value="Mozilla Reps">
   <input type="hidden" name="component" value="Mentorship">
   <input type="hidden" name="bug_severity" value="normal">

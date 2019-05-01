@@ -18,7 +18,7 @@ use Bugzilla::Extension::BugModal::MonkeyPatches;
 use Bugzilla::Extension::BugModal::Util qw(date_str_to_time);
 use Bugzilla::Constants;
 use Bugzilla::User::Setting;
-use Bugzilla::Util qw(trick_taint datetime_from html_quote time_ago);
+use Bugzilla::Util qw(datetime_from html_quote time_ago);
 use List::MoreUtils qw(any);
 use Template::Stash;
 use JSON::XS qw(encode_json);
@@ -49,7 +49,17 @@ sub _alternative_show_bug_format {
     return '' if $ctype ne 'html';
   }
   if (my $format = $cgi->param('format')) {
-    return ($format eq '__default__' || $format eq 'default') ? '' : $format;
+    my @ids = $cgi->param('id');
+    # Drop `format=default` as well as `format=multiple`, if a single bug ID is
+    # provided, by redirecting to the modal UI (301 Moved Permanently)
+    if ($format eq '__default__' || $format eq 'default'
+      || ($format eq 'multiple' && scalar(@ids) == 1))
+    {
+      $cgi->base_redirect('show_bug.cgi?id=' . $cgi->param('id'), 1);
+    }
+    # Otherwise, printable `format=multiple` is still available from bug lists
+    # as the Long Format option
+    return $format;
   }
   return $user->setting('ui_experiments') eq 'on' ? 'modal' : '';
 }

@@ -41,6 +41,16 @@
   </td>
 </tr>
 <tr>
+  <th class="field_label"><label for="default_bug_type">Default [% terms.Bug %] Type:</label></th>
+  <td>
+    [% INCLUDE admin/default_select.html.tmpl
+        field_name   = 'default_bug_type'
+        field_value  = comp.default_bug_type || product.default_bug_type
+        field_values = bug_fields.bug_type.legal_values
+    %]
+  </td>
+</tr>
+<tr>
   <th class="field_label"><label for="initialowner">Default Assignee:</label></th>
   <td>
     [% INCLUDE global/userselect.html.tmpl

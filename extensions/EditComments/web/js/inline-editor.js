@@ -48,7 +48,8 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
 
     this.$edit_button.addEventListener('click', event => this.edit_button_onclick(event));
 
-    // Check if the comment is written in Markdown
+    // Check if the comment is empty or written in Markdown
+    this.is_empty = this.$body.matches('.empty');
     this.is_markdown = this.$body.matches('[data-ismarkdown="true"]');
   }
 
@@ -105,6 +106,7 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
           <${preview_tag} tabindex="-1" class="comment-text ${this.is_markdown ? 'markdown-body' : ''}"></${preview_tag}>
         </div>
         <div role="toolbar" class="bottom-toolbar" aria-label="${this.str.toolbar}">
+          <span role="status"></span>
           ${BUGZILLA.user.is_insider && BUGZILLA.user.id !== this.commenter_id ? `<label>
             <input type="checkbox" value="on" checked data-action="hide"> ${this.str.hide_revision}</label>` : ''}
           <button type="button" class="minor" data-action="cancel" title="${this.str.cancel_tooltip} (Esc)"
@@ -127,6 +129,7 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
     this.$save_button = this.$container.querySelector('[data-action="save"]');
     this.$cancel_button = this.$container.querySelector('[data-action="cancel"]');
     this.$is_hidden_checkbox = this.$container.querySelector('[data-action="hide"]');
+    this.$status = this.$container.querySelector('[role="status"]');
 
     this.$edit_tab.addEventListener('click', () => this.edit());
     this.$preview_tab.addEventListener('click', () => this.preview());
@@ -137,6 +140,12 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
 
     // Adjust the height of `<textarea>`
     this.$textarea.style.height = `${this.$textarea.scrollHeight}px`;
+
+    // Let the user edit Description (Comment 0) immediately if it's empty
+    if (this.is_empty) {
+      this.fetch_onload({ comments: { [this.comment_id]: '' } });
+      return;
+    }
 
     // Retrieve the raw comment text
     bugzilla_ajax({
@@ -217,6 +226,12 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
       data: { id: BUGZILLA.bug_id, text: this.$textarea.value },
     }, data => {
       this.$preview.innerHTML = data.html;
+
+      // Highlight code if possible
+      if (Prism) {
+        Prism.highlightAllUnder(this.$preview);
+      }
+
       this.$preview.style.removeProperty('height');
       this.$preview.setAttribute('aria-busy', 'false');
     }, () => {
@@ -246,8 +261,8 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
     }
 
     // Disable the `<textarea>` and Save button while waiting for the response
-    this.$textarea.disabled = this.$save_button.disabled = true;
-    this.$save_button.textContent = this.str.saving;
+    this.$textarea.disabled = this.$save_button.disabled = this.$cancel_button.disabled = true;
+    this.$status.textContent = this.str.saving;
 
     bugzilla_ajax({
       url: `${BUGZILLA.config.basepath}rest/editcomments/comment/${this.comment_id}`,
@@ -276,11 +291,13 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
 
   /**
    * Enable or disable buttons on the comment actions toolbar (not the editor's own toolbar) while editing the comment
-   * to avoid any unexpected behaviour.
+   * to avoid any unexpected behaviour. The Reply button should always be disabled if the comment is empty.
    * @param {Boolean} disabled Whether the buttons should be disabled.
    */
   toggle_toolbar_buttons(disabled) {
-    this.$change_set.querySelectorAll('.comment-actions button').forEach($button => $button.disabled = disabled);
+    this.$change_set.querySelectorAll('.comment-actions button').forEach($button => {
+      $button.disabled = $button.matches('.reply-btn') && this.is_empty ? true : disabled;
+    });
   }
 
   /**
@@ -314,7 +331,19 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
    */
   save_onsuccess(data) {
     this.$body.innerHTML = data.html;
+
+    // Remove the empty state (new comment cannot be empty)
+    if (this.is_empty) {
+      this.is_empty = false;
+      this.$body.classList.remove('empty');
+    }
+
     this.finish();
+
+    // Highlight code if possible
+    if (Prism) {
+      Prism.highlightAllUnder(this.$body);
+    }
 
     if (!this.$revisions_link) {
       const $time = this.$change_set.querySelector('.change-time');
@@ -344,8 +373,8 @@ Bugzilla.InlineCommentEditor = class InlineCommentEditor {
    * @param {String} message Error message.
    */
   save_onerror(message) {
-    this.$textarea.disabled = this.$save_button.disabled = false;
-    this.$save_button.textContent = this.str.save;
+    this.$textarea.disabled = this.$save_button.disabled = this.$cancel_button.disabled = false;
+    this.$status.textContent = '';
 
     window.alert(`${this.str.save_error}\n\n${message}`);
   }

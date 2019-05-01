@@ -97,6 +97,8 @@ END;
 <div class="field
             [%~ " indent" IF no_label && !no_indent %]
             [%~ " inline" IF inline %]
+            [%~ " contains-buttons" IF use_buttons ~%]
+            [%~ " bug-list" IF field_type == constants.FIELD_TYPE_BUG_LIST ~%]
             [%~ " edit-hide" IF hide_on_edit %]
             [%~ " edit-show" IF hide_on_view && !hide_on_edit %]"
   [% IF name %] id="field-[% name FILTER html %]"[% END %]
@@ -187,6 +189,43 @@ END;
         [% CASE constants.FIELD_TYPE_SINGLE_SELECT %]
           [%# single value select %]
           <input type="hidden" id="[% name FILTER html %]-dirty">
+          [% IF use_buttons %]
+          <div role="radiogroup" class="buttons toggle" id="[% name FILTER html %]" [% aria_labelledby_html FILTER none %]>
+            [% IF values.defined %]
+              [% FOREACH v IN values %]
+                [% NEXT IF NOT v.is_active AND NOT value.contains(v.name).size %]
+                [% NEXT IF NOT bug.check_can_change_field(name, bug.${field_name}, v.name) %]
+                <div class="item">
+                  <input id="v[% v.id FILTER html %]_[% name FILTER html %]" type="radio" name="[% name FILTER html %]"
+                         value="[% v.name FILTER html %]" [% " checked" IF value.contains(v.name).size %]>
+                  <label for="v[% v.id FILTER html %]_[% name FILTER html %]">
+                    [% IF name == 'bug_type' %]
+                      <span class="bug-type-label iconic-text" data-type="[% v.name FILTER html %]">
+                        <span class="icon" aria-hidden="true"></span>[% v.name FILTER html %]
+                      </span>
+                    [% ELSE %]
+                      [%~ v.name FILTER html ~%]
+                    [% END %]
+                  </label>
+                </div>
+              [% END %]
+            [% ELSE %]
+            <div class="item">
+              <input id="[% name FILTER html %]_[% value FILTER html %]_radio" type="radio"
+                     name="[% name FILTER html %]" value="[% value FILTER html %]" checked>
+              <label for="[% name FILTER html %]_[% value FILTER html %]_radio">
+                [% IF name == 'bug_type' %]
+                  <span class="bug-type-label iconic-text" data-type="[% value FILTER html %]">
+                    <span class="icon" aria-hidden="true"></span>[% value FILTER html %]
+                  </span>
+                [% ELSE %]
+                  [%~ value FILTER html ~%]
+                [% END %]
+              </label>
+            </div>
+            [% END %]
+          </div>
+          [% ELSE %]
           <select name="[% name FILTER html %]" id="[% name FILTER html %]" [% aria_labelledby_html FILTER none %]>
             [% IF values.defined %]
               [% FOREACH v IN values %]
@@ -201,6 +240,7 @@ END;
               <option value="[% value FILTER html %]" selected>[% value FILTER html %]</option>
             [% END %]
           </select>
+          [% END %]
 
         [% CASE constants.FIELD_TYPE_MULTI_SELECT %]
           [%# multi value select %]
@@ -319,20 +359,38 @@ END;
 
 [%# bug-urls, currently just see-also %]
 [% BLOCK bug_urls %]
-  [% FOREACH url IN values %]
-    <div>
-      [% IF url.isa('Bugzilla::BugUrl::Bugzilla::Local') %]
-        [% url.target_bug_id FILTER bug_link(url.target_bug_id, use_alias => 1) FILTER none %]
-      [% ELSE %]
-        <a href="[% url.name FILTER html %]"
-           title="[% url.name FILTER truncate(256) FILTER html %]"
-        >[% url.name FILTER truncate(40) FILTER html %]</a>
-      [% END %]
+  [%
+    # Process internal (bug) and external links separately
+    internal_links = [];
+    external_links = [];
+    FOREACH value IN values;
+      IF value.isa('Bugzilla::BugUrl::Bugzilla::Local');
+        internal_links.push(value);
+      ELSE;
+        external_links.push(value);
+      END;
+    END;
+  %]
+
+  [% IF edit %]
+    [% FOREACH link IN internal_links %]
+      <div class="link">
+        [% link.bug.id FILTER bug_link(link.bug.id, use_alias => 1) FILTER none %]
+        <label><input type="checkbox" name="remove_see_also" value="[% link.name FILTER html %]"> Remove</label>
+      </div>
+    [% END %]
+  [% ELSE %]
+    [%# Show bugs by type %]
+    [% INCLUDE bug_list values=internal_links.pluck('bug') edit=0 %]
+  [% END %]
+
+  [% FOREACH link IN external_links %]
+    <div class="link">
+      <a href="[% link.name FILTER html %]" title="[% link.name FILTER truncate(256) FILTER html %]">
+        [%~ link.name FILTER pretty_url FILTER truncate(40) FILTER html ~%]
+      </a>
       [% IF edit %]
-          <label>
-            <input type="checkbox" name="remove_see_also" value="[% url.name FILTER html %]">
-            Remove
-          </label>
+        <label><input type="checkbox" name="remove_see_also" value="[% link.name FILTER html %]"> Remove</label>
       [% END %]
     </div>
   [% END %]
@@ -346,9 +404,22 @@ END;
 [%# bug lists, depencancies, blockers %]
 [% BLOCK bug_list %]
   [% IF NOT edit %]
-    [% FOREACH b IN values %]
-      [% INCLUDE bug/link.html.tmpl bug=b link_text=b.id use_alias=1  %]
-      [% ", " UNLESS loop.last %]
+    [% FOREACH type IN bug_fields.bug_type.legal_values.pluck('name') %]
+      [%
+        bugs = [];
+        FOREACH b IN values; bugs.push(b) IF b.bug_type == type; END;
+        NEXT UNLESS bugs.size > 0;
+      %]
+      <div class="bug-list">
+        <span class="bug-type-label iconic" title="[% type FILTER html %]"
+              aria-label="[% type FILTER html %]" data-type="[% type FILTER html %]">
+          <span class="icon" aria-hidden="true"></span>
+        </span>
+        [% FOREACH b IN bugs %]
+          [% INCLUDE bug/link.html.tmpl bug=b link_text=b.id use_alias=1  %]
+          [% ", " UNLESS loop.last %]
+        [% END %]
+      </div>
     [% END %]
   [% ELSE %]
     <input type="text" id="[% name FILTER html %]" name="[% name FILTER html %]"

@@ -22,7 +22,6 @@ use Bugzilla::Milestone;
 use Bugzilla::Product;
 use Bugzilla::Version;
 use List::MoreUtils qw(any first_value);
-use Taint::Util qw(untaint);
 
 # these methods are much lighter than our public API calls
 
@@ -89,13 +88,13 @@ sub initial_field_values {
   return {
     products => _name($user->get_enterable_products),
     keywords => _name([Bugzilla::Keyword->get_all()]),
+    default_bug_types => get_legal_field_values('bug_type'),
   };
 }
 
 sub product_info {
   my ($self, $params) = @_;
   if (!ref $params->{product_name}) {
-    untaint($params->{product_name});
   }
   else {
     ThrowCodeError('params_required',
@@ -104,8 +103,11 @@ sub product_info {
   my $product
     = Bugzilla::Product->check({name => $params->{product_name}, cache => 1});
   $product = Bugzilla->user->can_enter_product($product, 1);
-  my @components = map { {name => $_->name, description => $_->description,} }
-    @{$product->components};
+  my @components = map { {
+    name => $_->name,
+    description => $_->description,
+    default_bug_type => $_->default_bug_type,
+  } } @{$product->components};
   return {components => \@components, versions => _name($product->versions),};
 }
 
@@ -133,6 +135,7 @@ sub edit {
   $options{bug_severity} = _name('bug_severity', $bug->bug_severity);
   $options{rep_platform} = _name('rep_platform', $bug->rep_platform);
   $options{op_sys}       = _name('op_sys',       $bug->op_sys);
+  $options{bug_type}     = _name('bug_type',     $bug->bug_type);
 
   # custom select fields
   my @custom_fields = grep {

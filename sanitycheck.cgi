@@ -73,7 +73,7 @@ else {
   # Only check the token if we are running this script from the
   # web browser and a parameter is passed to the script.
   # XXX - Maybe these two parameters should be deleted once logged in?
-  $cgi->delete('GoAheadAndLogIn', 'Bugzilla_restrictlogin', 'hooks_only');
+  $cgi->delete('GoAheadAndLogIn', 'hooks_only');
   if (scalar($cgi->param())) {
     my $token = $cgi->param('token');
     check_hash_token($token, ['sanitycheck']);
@@ -306,7 +306,8 @@ if ($cgi->param('remove_invalid_bug_references')) {
     'cc/',                    'dependencies/blocked',
     'dependencies/dependson', 'duplicates/dupe',
     'duplicates/dupe_of',     'flags/',
-    'keywords/',              'longdescs/'
+    'keywords/',              'longdescs/',
+    'regressions/regresses',  'regressions/regressed_by'
     )
   {
 
@@ -516,6 +517,8 @@ CrossCheck(
   ["longdescs",     "bug_id"],
   ["dependencies",  "blocked"],
   ["dependencies",  "dependson"],
+  ["regressions",   "regresses"],
+  ["regressions",   "regressed_by"],
   ['flags',         'bug_id'],
   ["keywords",      "bug_id"],
   ["duplicates", "dupe_of", "dupe"],
@@ -591,6 +594,8 @@ CrossCheck(
   ["flagexclusions", "component_id", "type_id"],
   ["flaginclusions", "component_id", "type_id"]
 );
+
+CrossCheck("bug_type", "value", ["bugs", "bug_type", "bug_id"]);
 
 # Check the former enum types -mkanat@bugzilla.org
 CrossCheck("bug_status", "value", ["bugs", "bug_status", "bug_id"]);

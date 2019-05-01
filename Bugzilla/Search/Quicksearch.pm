@@ -28,11 +28,15 @@ use base qw(Exporter);
 # Custom mappings for some fields.
 use constant MAPPINGS => {
 
-  # Status, Resolution, Platform, OS, Priority, Severity
+  # Type, Status, Resolution, Platform, OS, Priority, Severity
+  "type"     => "bug_type",
   "status"   => "bug_status",
   "platform" => "rep_platform",
   "os"       => "op_sys",
   "severity" => "bug_severity",
+
+  # Dependencies, Regressions
+  "regressions" => "regresses",
 
   # People: AssignedTo, Reporter, QA Contact, CC, etc.
   "assignee" => "assigned_to",
@@ -86,7 +90,7 @@ sub FIELD_MAP {
   # "reporter_accessible" and "reporter" both match "rep".
   delete @full_map{
     qw(rep_platform bug_status bug_file_loc bug_group
-      bug_severity bug_status
+      bug_severity bug_status bug_type
       status_whiteboard
       cclist_accessible reporter_accessible)
   };
@@ -127,7 +131,8 @@ use constant COMPONENT_EXCEPTIONS => (
 );
 
 # Quicksearch-wide globals for boolean charts.
-our ($chart, $and, $or, $fulltext, $bug_status_set, $ELASTIC);
+our ($chart, $and, $or, $longdesc_initial, $fulltext, $bug_status_set,
+     $bug_product_set, $ELASTIC);
 
 sub quicksearch {
   my ($searchstring) = (@_);
@@ -195,6 +200,12 @@ sub quicksearch {
         unshift(@words, "-$word");
       }
 
+      # --description and ++description disable or enable description searching
+      elsif ($word =~ /^(--|\+\+)description?$/i) {
+        $longdesc_initial = $1 eq '--' ? 0 : 1;
+        $cgi->param('longdesc_initial', $longdesc_initial);
+      }
+
       # --comment and ++comment disable or enable fulltext searching
       elsif ($word =~ /^(--|\+\+)comments?$/i) {
         $fulltext = $1 eq '--' ? 0 : 1;
@@ -253,6 +264,16 @@ sub quicksearch {
       $cgi->param('bug_status', BUG_STATE_OPEN);
     }
 
+    # Provide a hook to allow modifying the params
+    Bugzilla::Hook::process(
+      'quicksearch_run',
+      {
+        'cgi'             => $cgi,
+        'bug_status_set'  => $bug_status_set,
+        'bug_product_set' => $bug_product_set,
+      }
+    );
+
     # Inform user about any unknown fields
     if (scalar(@unknownFields) || scalar(keys %ambiguous_fields)) {
       ThrowUserError(
@@ -274,11 +295,8 @@ sub quicksearch {
   my $modified_query_string = $cgi->canonicalise_query(@params_to_strip);
 
   if ($cgi->param('load')) {
-    my $urlbase = Bugzilla->localconfig->{urlbase};
-
     # Param 'load' asks us to display the query in the advanced search form.
-    print $cgi->redirect(
-      -uri => "${urlbase}query.cgi?format=advanced&amp;" . $modified_query_string);
+    $cgi->base_redirect("query.cgi?format=advanced&$modified_query_string");
   }
 
   # Otherwise, pass the modified query string to the caller.
@@ -325,9 +343,7 @@ sub _bug_numbers_only {
   if ($searchstring !~ /,/ && !i_am_webservice()) {
 
     # Single bug number; shortcut to show_bug.cgi.
-    print $cgi->redirect(
-      -uri => Bugzilla->localconfig->{urlbase} . "show_bug.cgi?id=$searchstring");
-    exit;
+    $cgi->base_redirect("show_bug.cgi?id=$searchstring");
   }
   else {
     # List of bug numbers.
@@ -401,6 +417,8 @@ sub _handle_special_first_chars {
 
   if ($firstChar eq '#') {
     addChart('short_desc', 'substring', $baseWord, $negate);
+    addChart('longdesc',   'substring', $baseWord, $negate)
+      if $longdesc_initial;
     addChart('content', 'matches', _matches_phrase($baseWord), $negate)
       if $fulltext;
     return 1;
@@ -476,6 +494,9 @@ sub _handle_field_names {
       else {
         if ($translated eq 'bug_status' || $translated eq 'resolution') {
           $bug_status_set = 1;
+        }
+        if ($translated =~ /^(?:classification|product|component)$/) {
+          $bug_product_set = 1;
         }
         foreach my $value (@values) {
           next unless defined $value;
@@ -616,7 +637,8 @@ sub _default_quicksearch_word {
   addChart('alias',             'substring', $word, $negate);
   addChart('short_desc',        'substring', $word, $negate);
   addChart('status_whiteboard', 'substring', $word, $negate);
-  addChart('longdesc',          'substring', $word, $negate) if $ELASTIC;
+  addChart('longdesc',          'substring', $word, $negate)
+    if $longdesc_initial || $ELASTIC;
   addChart('content', 'matches', _matches_phrase($word), $negate)
     if $fulltext && !$ELASTIC;
 

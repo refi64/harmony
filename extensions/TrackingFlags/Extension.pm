@@ -301,12 +301,16 @@ sub install_filesystem {
 
 sub active_custom_fields {
   my ($self, $args) = @_;
+  my $wants     = $args->{'wants'};
   my $fields    = $args->{'fields'};
   my $params    = $args->{'params'};
   my $product   = $params->{'product'};
   my $component = $params->{'component'};
 
   return if $params->{skip_extensions};
+  if ($wants && $wants->is_specific) {
+    return if none { $wants->include->{$_} } Bugzilla->tracking_flag_names;
+  }
 
   # Create a hash of current fields based on field names
   my %field_hash = map { $_->name => $_ } @$$fields;
@@ -349,7 +353,7 @@ sub buglist_column_joins {
 
   # if there are elements in the tracking_flags array, then they have been
   # removed from the query, so we mustn't generate joins
-  return if scalar @{$args->{search}->{tracking_flags}};
+  return if scalar @{$args->{search}->{tracking_flags} || []};
 
   my $column_joins   = $args->{'column_joins'};
   my @tracking_flags = Bugzilla::Extension::TrackingFlags::Flag->get_all;

@@ -18,7 +18,7 @@ use Bugzilla::Constants;
 use Bugzilla::Error;
 use Bugzilla::Logging;
 use Bugzilla::User;
-use Bugzilla::Util qw(detaint_natural trick_taint);
+use Bugzilla::Util qw(detaint_natural);
 use Bugzilla::WebService::Constants;
 use Types::Standard qw(-types slurpy);
 use Type::Params qw(compile);
@@ -172,6 +172,7 @@ sub bug_revisions {
     my $revision_obj  = Bugzilla::Extension::PhabBugz::Revision->new($revision);
     my $revision_data = {
       id          => 'D' . $revision_obj->id,
+      sortkey     => $revision_obj->id,
       author      => $revision_obj->author->name,
       status      => $revision_obj->status,
       long_status => $revision_status_map->{$revision_obj->status}
@@ -200,7 +201,7 @@ sub bug_revisions {
   }
 
   # sort by revision id
-  @revisions = sort { $a->{id} cmp $b->{id} } @revisions;
+  @revisions = sort { $a->{sortkey} <=> $b->{sortkey} } @revisions;
 
   return {revisions => \@revisions};
 }

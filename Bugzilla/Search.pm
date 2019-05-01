@@ -159,6 +159,7 @@ use constant OPERATORS => {
   anywords       => \&_anywords,
   allwords       => \&_allwords,
   nowords        => \&_nowords,
+  everchanged    => \&_everchanged,
   changedbefore  => \&_changedbefore_changedafter,
   changedafter   => \&_changedbefore_changedafter,
   changedfrom    => \&_changedfrom_changedto,
@@ -212,6 +213,7 @@ use constant NON_NUMERIC_OPERATORS => qw(
 
 # These operators ignore the entered value
 use constant NO_VALUE_OPERATORS => qw(
+  everchanged
   isempty
   isnotempty
 );
@@ -266,12 +268,14 @@ use constant OPERATOR_FIELD_OVERRIDE => {
   'flagtypes.name' => {_non_changed => \&_flagtypes_nonchanged,},
   longdesc         => {
     changedby     => \&_long_desc_changedby,
+    everchanged   => \&_long_desc_everchanged,
     changedbefore => \&_long_desc_changedbefore_after,
     changedafter  => \&_long_desc_changedbefore_after,
     _non_changed  => \&_long_desc_nonchanged,
   },
   'longdescs.count' => {
     changedby     => \&_long_desc_changedby,
+    everchanged   => \&_long_desc_everchanged,
     changedbefore => \&_long_desc_changedbefore_after,
     changedafter  => \&_long_desc_changedbefore_after,
     changedfrom   => \&_invalid_combination,
@@ -287,6 +291,8 @@ use constant OPERATOR_FIELD_OVERRIDE => {
     _default      => \&_invalid_combination,
   },
   product     => {_non_changed => \&_product_nonchanged,},
+  regressed_by  => MULTI_SELECT_OVERRIDE,
+  regresses     => MULTI_SELECT_OVERRIDE,
   tag         => MULTI_SELECT_OVERRIDE,
   comment_tag => MULTI_SELECT_OVERRIDE,
 
@@ -295,6 +301,7 @@ use constant OPERATOR_FIELD_OVERRIDE => {
   percentage_complete => {_non_changed => \&_percentage_complete,},
   work_time           => {
     changedby     => \&_work_time_changedby,
+    everchanged   => \&_work_time_everchanged,
     changedbefore => \&_work_time_changedbefore_after,
     changedafter  => \&_work_time_changedbefore_after,
     _default      => \&_work_time,
@@ -335,6 +342,8 @@ sub SPECIAL_PARSING {
     commenter               => \&_commenter_pronoun,
     qa_contact              => \&_contact_pronoun,
     reporter                => \&_contact_pronoun,
+    'requestees.login_name' => \&_contact_pronoun,
+    'setters.login_name'    => \&_contact_pronoun,
 
     # Date Fields that accept the 1d, 1w, 1m, 1y, etc. format.
     creation_ts => \&_datetime_translate,
@@ -483,6 +492,8 @@ sub COLUMN_JOINS {
     },
     blocked           => {table => 'dependencies', to   => 'dependson',},
     dependson         => {table => 'dependencies', to   => 'blocked',},
+    regresses         => {table => 'regressions',  to   => 'regressed_by',},
+    regressed_by      => {table => 'regressions',  to   => 'regresses',},
     'longdescs.count' => {table => 'longdescs',    join => 'INNER',},
     last_visit_ts     => {
       as    => 'bug_user_last_visit',
@@ -565,6 +576,9 @@ sub COLUMNS {
 
     blocked   => $dbh->sql_group_concat('DISTINCT map_blocked.blocked'),
     dependson => $dbh->sql_group_concat('DISTINCT map_dependson.dependson'),
+
+    regresses     => $dbh->sql_group_concat('DISTINCT map_regresses.regresses'),
+    regressed_by  => $dbh->sql_group_concat('DISTINCT map_regressed_by.regressed_by'),
 
     'longdescs.count'   => 'COUNT(DISTINCT map_longdescs_count.comment_id)',
     last_visit_ts       => 'bug_user_last_visit.last_visit_ts',
@@ -677,6 +691,8 @@ use constant GROUP_BY_SKIP => qw(
   keywords
   longdescs.count
   percentage_complete
+  regressed_by
+  regresses
 );
 
 ###############
@@ -1884,7 +1900,6 @@ sub _handle_chart {
 
   $self->_chart_fields->{$field}
     or ThrowCodeError("invalid_field_name", {field => $field});
-  trick_taint($field);
 
   # This is the field as you'd reference it in a SQL statement.
   my $full_field = $field =~ /\./ ? $field : "bugs.$field";
@@ -2091,7 +2106,6 @@ sub _quote_unless_numeric {
   my $is_numeric       = $numeric_operator && $numeric_field && $numeric_value;
   if ($is_numeric) {
     my $quoted = $value;
-    trick_taint($quoted);
     return $quoted;
   }
   return Bugzilla->dbh->quote($value);
@@ -2303,7 +2317,7 @@ sub SqlifyDate {
 
 sub pronoun {
   my ($noun, $user) = (@_);
-  if ($noun eq "%user%") {
+  if ($noun eq "%user%" || $noun eq "%self%") {
     if ($user->id) {
       return $user->id;
     }
@@ -2313,6 +2327,11 @@ sub pronoun {
   }
   if ($noun eq "%reporter%") {
     return "bugs.reporter";
+  }
+  if ($noun eq "%triageowner%") {
+    return "(SELECT COALESCE(userid, 0) FROM profiles
+      JOIN components ON components.triage_owner_id = profiles.userid
+      WHERE bugs.component_id = components.id)";
   }
   if ($noun eq "%assignee%") {
     return "bugs.assigned_to";
@@ -2456,7 +2475,7 @@ sub _triage_owner_pronoun {
   my ($self, $args) = @_;
   my $value = $args->{value};
   my $user  = $self->_user;
-  if ($value eq "%user%") {
+  if ($value eq "%user%" || $value eq "%self%") {
     if ($user->id) {
       $args->{value}       = $user->id;
       $args->{quoted}      = $args->{value};
@@ -2610,6 +2629,12 @@ sub _long_desc_changedby {
   $args->{term} = "$table.who = $user_id";
 }
 
+sub _long_desc_everchanged {
+  my ($self, $args) = @_;
+  $self->_convert_everchanged($args);
+  $self->_long_desc_changedbefore_after($args);
+}
+
 sub _long_desc_changedbefore_after {
   my ($self, $args) = @_;
   my ($chart_id, $operator, $value, $joins)
@@ -2659,6 +2684,12 @@ sub _long_desc_nonchanged {
     bugs_table => $bugs_table,
   };
   $self->_do_operator_function($join_args);
+
+  # Allow to search only in bug description (initial comment)
+  if ($self->_params->{longdesc_initial}) {
+    $join_args->{term}
+      .= ($join_args->{term} ? " AND " : "") . "$table.bug_when = bugs.creation_ts";
+  }
 
   # If the user is not part of the insiders group, they cannot see
   # private comments
@@ -2743,6 +2774,12 @@ sub _work_time_changedby {
   push(@$joins, {table => 'longdescs', as => $table});
   my $user_id = login_to_id($value, THROW_ERROR);
   $args->{term} = "$table.who = $user_id AND $table.work_time != 0";
+}
+
+sub _work_time_everchanged {
+  my ($self, $args) = @_;
+  $self->_convert_everchanged($args);
+  $self->_work_time_changedbefore_after($args);
 }
 
 sub _work_time_changedbefore_after {
@@ -3099,6 +3136,12 @@ sub _multiselect_table {
     $args->{full_field}    = $field;
     return "dependencies";
   }
+  elsif ($field eq 'regresses' or $field eq 'regressed_by') {
+    my $select = $field eq 'regresses' ? 'regressed_by' : 'regresses';
+    $args->{_select_field} = $select;
+    $args->{full_field}    = $field;
+    return "regressions";
+  }
   elsif ($field eq 'longdesc') {
     $args->{_extra_where} = " AND isprivate = 0" if !$self->_user->is_insider;
     $args->{full_field} = 'thetext';
@@ -3199,6 +3242,17 @@ sub _multiselect_isempty {
       to    => $to,
       };
     return "dependencies_$chart_id.$to IS $not NULL";
+  }
+  elsif ($field eq 'regresses' or $field eq 'regressed_by') {
+    my $to = $field eq 'regresses' ? 'regressed_by' : 'regresses';
+    push @$joins,
+      {
+      table => 'regressions',
+      as    => "regressions_$chart_id",
+      from  => 'bug_id',
+      to    => $to,
+      };
+    return "regressions_$chart_id.$to IS $not NULL";
   }
   elsif ($field eq 'longdesc') {
     my @extra = ("longdescs_$chart_id.type != " . CMT_HAS_DUPE);
@@ -3368,6 +3422,21 @@ sub _nowords {
   $self->_anywords($args);
   my $term = $args->{term};
   $args->{term} = "NOT($term)";
+}
+
+# Add support for the `everchanged` operator, which is a shortcut for
+# `changedafter`: `1970-01-01`
+sub _convert_everchanged {
+  my ($self, $args) = @_;
+  $args->{operator} = 'changedafter';
+  $args->{value}    = EMPTY_DATE;
+  $args->{quoted}   = Bugzilla->dbh->quote(EMPTY_DATE);
+}
+
+sub _everchanged {
+  my ($self, $args) = @_;
+  $self->_convert_everchanged($args);
+  $self->_changedbefore_changedafter($args);
 }
 
 sub _changedbefore_changedafter {

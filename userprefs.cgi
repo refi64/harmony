@@ -214,8 +214,7 @@ sub DisableAccount {
   $user->update();
 
   Bugzilla->logout();
-  print Bugzilla->cgi->redirect(Bugzilla->localconfig->{urlbase});
-  exit;
+  Bugzilla->cgi->base_redirect();
 }
 
 sub DoSettings {
@@ -626,8 +625,6 @@ sub SaveSavedSearches {
       # allowed to.
       next unless grep($_ eq $group_id, @{$user->queryshare_groups});
 
-      # $group_id is now definitely a valid ID of a group the
-      # user can share queries with, so we can trick_taint.
       detaint_natural($group_id);
       if ($q->shared_with_group) {
         $sth_update_ngm->execute($group_id, $q->id);
@@ -775,7 +772,6 @@ sub DoMFA {
       || ThrowTemplateError($template->error());
   }
   elsif ($provider =~ /^[a-z]+$/) {
-    trick_taint($provider);
     $template->process("mfa/$provider/enroll.html.tmpl", $vars)
       || ThrowTemplateError($template->error());
   }
@@ -854,8 +850,12 @@ sub SaveApiKey {
   foreach my $api_key (@$api_keys) {
     my $description = $cgi->param('description_' . $api_key->id);
     my $revoked     = !!$cgi->param('revoked_' . $api_key->id);
+    my $sticky      = !!$cgi->param('sticky_' . $api_key->id);
 
-    if ($description ne $api_key->description || $revoked != $api_key->revoked) {
+    if ( $description ne $api_key->description
+      || $revoked != $api_key->revoked
+      || $sticky != $api_key->sticky)
+    {
       if ($user->mfa && !$revoked && $api_key->revoked) {
         push @mfa_events,
           {
@@ -866,7 +866,9 @@ sub SaveApiKey {
           };
       }
       else {
-        $api_key->set_all({description => $description, revoked => $revoked,});
+        $sticky = 1 if $api_key->sticky;
+        $api_key->set_all(
+          {description => $description, revoked => $revoked, sticky => $sticky});
         $api_key->update();
         if ($revoked) {
           Bugzilla->log_user_request(undef, undef, 'api-key-revoke');
@@ -984,9 +986,6 @@ my $mfa_token       = $cgi->param('mfa_token');
 $vars->{'changes_saved'} = $save_changes || $mfa_token;
 
 my $current_tab_name = $cgi->param('tab') || "account";
-
-# The SWITCH below makes sure that this is valid
-trick_taint($current_tab_name);
 
 $vars->{'current_tab_name'} = $current_tab_name;
 

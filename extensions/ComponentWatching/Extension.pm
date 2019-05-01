@@ -18,7 +18,7 @@ use Bugzilla::Error;
 use Bugzilla::Group;
 use Bugzilla::User;
 use Bugzilla::User::Setting;
-use Bugzilla::Util qw(detaint_natural trim trick_taint);
+use Bugzilla::Util qw(detaint_natural trim);
 
 our $VERSION = '2';
 
@@ -243,7 +243,7 @@ sub _check_watch_user {
   if ($value eq '') {
     ThrowUserError('component_watch_missing_watch_user');
   }
-  if ($value !~ /\.bugs$/i) {
+  if ($value !~ /@(?!invalid).+\.bugs$/i) {
     ThrowUserError('component_watch_invalid_watch_user');
   }
   return Bugzilla::User->check($value)->id;
@@ -571,7 +571,6 @@ sub _addPrefixWatch {
   my ($user, $product, $prefix) = @_;
   my $dbh = Bugzilla->dbh;
 
-  trick_taint($prefix);
   my $sth = $dbh->prepare("
         SELECT 1
           FROM component_watch

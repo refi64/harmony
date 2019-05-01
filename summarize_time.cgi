@@ -16,7 +16,7 @@ use Date::Parse;    # strptime
 
 use Bugzilla;
 use Bugzilla::Constants;    # LOGIN_*
-use Bugzilla::Bug;          # EmitDependList
+use Bugzilla::Bug;          # list_relationship
 use Bugzilla::Util;         # trim
 use Bugzilla::Error;
 
@@ -149,8 +149,6 @@ sub sqlize_dates {
   my @date_values;
   if ($start_date) {
 
-    # we've checked, trick_taint is fine
-    trick_taint($start_date);
     $date_bits = " AND longdescs.bug_when > ?";
     push @date_values, $start_date;
   }
@@ -172,7 +170,8 @@ sub sqlize_dates {
 sub get_blocker_ids {
   my ($bug_id, $unique) = @_;
   $unique ||= {$bug_id => 1};
-  my $deps = Bugzilla::Bug::EmitDependList("blocked", "dependson", $bug_id);
+  my $deps
+    = Bugzilla::Bug::list_relationship('dependencies', 'blocked', 'dependson', $bug_id);
   my @unseen = grep { !$unique->{$_}++ } @$deps;
   foreach $bug_id (@unseen) {
     get_blocker_ids($bug_id, $unique);

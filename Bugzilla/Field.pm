@@ -249,6 +249,13 @@ use constant DEFAULT_FIELDS => (
     buglist => 1
   },
   {
+    name           => 'bug_type',
+    desc           => 'Type',
+    in_new_bugmail => 1,
+    type           => FIELD_TYPE_SINGLE_SELECT,
+    buglist        => 1
+  },
+  {
     name           => 'bug_severity',
     desc           => 'Severity',
     in_new_bugmail => 1,
@@ -281,6 +288,20 @@ use constant DEFAULT_FIELDS => (
   {
     name           => 'blocked',
     desc           => 'Blocks',
+    in_new_bugmail => 1,
+    is_numeric     => 1,
+    buglist        => 1
+  },
+  {
+    name           => 'regressed_by',
+    desc           => 'Regressed by',
+    in_new_bugmail => 1,
+    is_numeric     => 1,
+    buglist        => 1
+  },
+  {
+    name           => 'regresses',
+    desc           => 'Regressions',
     in_new_bugmail => 1,
     is_numeric     => 1,
     buglist        => 1
@@ -1466,7 +1487,6 @@ sub check_field {
     or !grep { $_ eq $value } @$legalsRef)
   {
     return 0 if $no_warn;    # We don't want an error to be thrown; return.
-    trick_taint($name);
 
     my $field = new Bugzilla::Field({name => $name});
     my $field_desc = $field ? $field->description : $name;
@@ -1497,7 +1517,6 @@ sub get_field_id {
   my ($name) = @_;
   my $dbh = Bugzilla->dbh;
 
-  trick_taint($name);
   my $id = $dbh->selectrow_array(
     'SELECT id FROM fielddefs
                                     WHERE name = ?', undef, $name

@@ -101,8 +101,6 @@ sub get_format {
   # Security - allow letters and a hyphen only
   $ctype =~ s/[^a-zA-Z\-]//g;
   $format =~ s/[^a-zA-Z\-]//g;
-  trick_taint($ctype);
-  trick_taint($format);
 
   $template .= ($format ? "-$format" : "");
   $template .= ".$ctype.tmpl";
@@ -704,14 +702,6 @@ sub create {
         return $var;
       },
 
-      # Prevents line break on hyphens and whitespaces.
-      no_break => sub {
-        my ($var) = @_;
-        $var =~ s/ /\&nbsp;/g;
-        $var =~ s/-/\&#8209;/g;
-        return $var;
-      },
-
       # Insert `<wbr>` HTML tags to camel and snake case words as well as
       # words containing dots in the given string so a long bug summary,
       # for example, will be wrapped in a preferred manner rather than
@@ -773,10 +763,24 @@ sub create {
         1
       ],
 
-      bug_list_link => sub {
-        my ($buglist, $options) = @_;
-        return
-          join(", ", map(get_bug_link($_, $_, $options), split(/ *, */, $buglist)));
+      bug_list_link => [
+        sub {
+          my ($context, $options) = @_;
+          return sub {
+            my $buglist = shift;
+            return join(", ",
+              map { get_bug_link($_, $_, $options) } split(/\s*,\s*/, $buglist));
+          };
+        },
+        1
+      ],
+
+      # Create a short, readable label for the given URL.
+      # e.g. https://www.mozilla.org/firefox/ -> mozilla.org/firefox
+      pretty_url => sub {
+        my ($url) = @_;
+        $url =~ s/^\s*(?:https?:\/\/(?:www\.)?)?(.+?)\/?\s*$/$1/g;
+        return $url;
       },
 
       # In CSV, quotes are doubled, and any value containing a quote or a
@@ -973,8 +977,8 @@ sub create {
       'current_language' => sub { return Bugzilla->current_language; },
 
       'script_nonce' => sub {
-        my $cgi = Bugzilla->cgi;
-        return $cgi->csp_nonce ? sprintf('nonce="%s"', $cgi->csp_nonce) : '';
+        my $C = $Bugzilla::App::CGI::C or return '';
+        return $C->csp_nonce ? sprintf('nonce="%s"', $C->csp_nonce) : '';
       },
 
       # If an sudo session is in progress, this is the user who
