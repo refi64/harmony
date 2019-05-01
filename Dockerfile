@@ -1,12 +1,4 @@
-FROM mozillabteam/bmo-slim:20190404.1
-
-ARG CI
-ARG CIRCLE_SHA1
-ARG CIRCLE_BUILD_URL
-
-ENV CI=${CI}
-ENV CIRCLE_BUILD_URL=${CIRCLE_BUILD_URL}
-ENV CIRCLE_SHA1=${CIRCLE_SHA1}
+FROM perl:5.28.0-slim AS builder
 
 ENV LOG4PERL_CONFIG_FILE=log4perl-json.conf
 
@@ -15,16 +7,17 @@ ENV PORT=8000
 # we run a loopback logging server on this TCP port.
 ENV LOGGING_PORT=5880
 
+RUN apt-get update
+RUN apt-get install -y build-essential curl
+RUN cpanm --notest Module::CPANfile App::cpm
+
 WORKDIR /app
-COPY . .
+COPY Makefile.PL Bugzilla.pm gen-cpanfile.pl /app/
 
-RUN mv /opt/bmo/local /app && \
-    chown -R app:app /app && \
-    perl -I/app -I/app/local/lib/perl5 -c -E 'use Bugzilla; BEGIN { Bugzilla->extensions }' && \
-    perl -c /app/scripts/entrypoint.pl && \
-    setcap 'cap_net_bind_service=+ep' /usr/bin/perl
-
-USER app
+RUN perl Makefile.PL
+RUN make cpanfile
+RUN apt-get install -y libexpat-dev
+RUN cpm install
 
 RUN perl checksetup.pl --no-database --default-localconfig && \
     rm -rf /app/data /app/localconfig && \
@@ -32,5 +25,5 @@ RUN perl checksetup.pl --no-database --default-localconfig && \
 
 EXPOSE $PORT
 
-ENTRYPOINT ["/app/scripts/entrypoint.pl"]
-CMD ["httpd"]
+ENTRYPOINT ["/app/bugzilla.pl"]
+CMD ["daemon"]
