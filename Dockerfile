@@ -8,7 +8,7 @@ ENV PORT=8000
 ENV LOGGING_PORT=5880
 
 RUN apt-get update
-RUN apt-get install -y build-essential curl libssl-dev zlib1g-dev openssl
+RUN apt-get install -y build-essential curl libssl-dev zlib1g-dev openssl libexpat-dev
 RUN cpanm --notest Module::CPANfile App::cpm
 
 WORKDIR /app
@@ -16,7 +16,6 @@ COPY Makefile.PL Bugzilla.pm gen-cpanfile.pl /app/
 
 RUN perl Makefile.PL
 RUN make cpanfile
-RUN apt-get install -y libexpat-dev
 RUN cpm install
 
 RUN perl checksetup.pl --no-database --default-localconfig && \
