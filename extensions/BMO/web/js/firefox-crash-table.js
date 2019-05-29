@@ -12,6 +12,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const VERSION = "0.4.0";
 
   async function fetchProductDetails() {
+    const $meta = document.querySelector('meta[name="firefox-versions"]');
+
+    if ($meta) {
+      return JSON.parse($meta.content);
+    }
+
     const url = "https://product-details.mozilla.org/1.0/firefox_versions.json";
     const response = await fetch(url);
     return await response.json();
@@ -111,7 +117,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (container) {
     const signatures = [];
     const selector = oldWay ? "cf_crash_signature_edit_container" : "field-value-cf_crash_signature";
-    const baseCrashUrl = "https://crash-stats.mozilla.com/signature/?signature=";
+    const baseCrashUrl = "https://crash-stats.mozilla.org/signature/?signature=";
     document.querySelectorAll("#" + selector + " a").forEach(a => {
       if (a.href.startsWith(baseCrashUrl)) {
         const encodedSignature = a.href.replace(baseCrashUrl, "")
@@ -125,7 +131,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
 
       const extraSocorroArgs = []
-      const baseUrl = "https://crash-stats.mozilla.com/search/";
+      const baseUrl = "https://crash-stats.mozilla.org/search/";
       const sayNo = new Set(["_columns", "_facets", "_facets_size", "_sort", "_results_number", "date", "channel", "product", "version", "build_id"]);
       const urlSelector = oldWay ? "bz_url_edit_container" : "field-value-bug_file_loc";
       document.querySelectorAll("#" + urlSelector + " a").forEach(a => {
@@ -244,14 +250,14 @@ window.addEventListener('DOMContentLoaded', () => {
       iframe.setAttribute("src", crashStopLink);
       iframe.setAttribute("id", "crash-stop-iframe");
       iframe.setAttribute("tabindex", "0");
-      iframe.setAttribute("style", "display:block;width:100%;height:100%;border:0px;");
+      iframe.setAttribute("style", "display:block;width:100%;height:100%;margin-top:8px;border:0px;");
       const titleDiv = document.createElement("div");
       titleDiv.setAttribute("title", "Hide crash-stop");
-      titleDiv.setAttribute("style", "display:inline;cursor:pointer;color:black;font-size:13px");
+      titleDiv.setAttribute("style", "display:inline;cursor:pointer;font-size:13px");
       const spinner = document.createElement("span");
       spinner.setAttribute("role", "button");
       spinner.setAttribute("tabindex", "0");
-      spinner.setAttribute("style", "padding-right:5px;cursor:pointer;color:#999;");
+      spinner.setAttribute("style", "padding-right:5px;cursor:pointer;");
 
       function hide() {
         spinner.innerText = "▸";

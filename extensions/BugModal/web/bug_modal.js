@@ -948,7 +948,7 @@ $(function() {
     } else if (BUGZILLA.user.settings.zoom_textareas) {
         // add comment --> enlarge on focus
         $('#comment').focus(function(event) {
-            $(event.target).attr('rows', 25);
+            $(event.target).attr('rows', 15);
         });
     }
 
@@ -1384,9 +1384,6 @@ $(function() {
             saveBugComment(event.target.value);
         });
 
-    // finally switch to edit mode if we navigate back to a page that was editing
-    $(window).on('pageshow', restoreEditMode);
-    $(window).on('pageshow', restoreSavedBugComment);
     restoreEditMode();
     restoreSavedBugComment();
 });

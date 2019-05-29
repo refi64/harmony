@@ -740,7 +740,7 @@ sub DEFAULT_CSP {
       'https://crash-stop-addon.herokuapp.com',
     ],
     worker_src  => ['none',],
-    img_src     => ['self', 'blob:', 'https://secure.gravatar.com'],
+    img_src     => ['self', 'data:', 'blob:', 'https://secure.gravatar.com'],
     style_src   => ['self', 'unsafe-inline'],
     object_src  => ['none'],
     connect_src => [
@@ -756,7 +756,7 @@ sub DEFAULT_CSP {
       'https://treeherder.mozilla.org/api/failurecount/',
 
       # socorro lens
-      'https://crash-stats.mozilla.com/api/SuperSearch/',
+      'https://crash-stats.mozilla.org/api/SuperSearch/',
     ],
     font_src => [ 'self', 'https://fonts.gstatic.com' ],
     form_action => [
@@ -788,7 +788,7 @@ sub SHOW_BUG_MODAL_CSP {
       'unsafe-inline', 'unsafe-eval',
       'https://www.google-analytics.com'
     ],
-    img_src     => ['self', 'https://secure.gravatar.com'],
+    img_src     => ['self', 'data:', 'https://secure.gravatar.com'],
     media_src   => ['self'],
     connect_src => [
       'self',
