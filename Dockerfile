@@ -8,7 +8,7 @@ ENV PORT=8000
 ENV LOGGING_PORT=5880
 
 RUN apt-get update
-RUN apt-get install -y build-essential curl
+RUN apt-get install -y build-essential curl libssl-dev zlib1g-dev openssl
 RUN cpanm --notest Module::CPANfile App::cpm
 
 WORKDIR /app
