@@ -82,39 +82,36 @@
 
 [%###################  TABLE HEADER   ######################%]
 
-<table class="standard">
-  <thead>
-  <tr>
-    [% FOREACH col = columns %]
+<table id="admin_table" border="1" cellpadding="4" cellspacing="0">
+  <tr bgcolor="#6666FF">
+    [% FOREACH c = columns %]
       [%# Default to align left for headers %]
-      <th align="[% (col.align || 'left') FILTER html %]">
-        [% col.heading FILTER html %]
+      <th align="[% (c.align || 'left') FILTER html %]">
+        [% c.heading FILTER html %]
       </th>
     [% END %]
   </tr>
-  </thead>
 
 
 [%###################  TABLE CONTENT  ######################%]
 
-  <tbody>
 [% FOREACH row = data %]
 
   <tr>
-    [% FOREACH col = columns %]
+    [% FOREACH c = columns %]
 
       [%# Copy to local variables, as we may update these %]
-      [% contentlink = col.contentlink
-         content = col.content
-         content_use_field = col.content_use_field
-         align = col.align
-         class = col.class
-         allow_html_content = col.allow_html_content
-         yesno_field = col.yesno_field
+      [% contentlink = c.contentlink
+         content = c.content
+         content_use_field = c.content_use_field
+         align = c.align
+         class = c.class
+         allow_html_content = c.allow_html_content
+         yesno_field = c.yesno_field
        %]
 
-      [%# Get any specific "important" overrides for this col.name and row.name ? %]
-      [% SET important = overrides.${col.name}.name.${row.name} %]
+      [%# Get any specific "important" overrides for this c.name and row.name ? %]
+      [% SET important = overrides.${c.name}.name.${row.name} %]
 
       [% IF important %]
 
@@ -125,9 +122,9 @@
       [% ELSE %]
 
           [%# Are there any specific overrides for this column? %]
-          [% FOREACH match_field = overrides.${col.name}.keys %]
+          [% FOREACH match_field = overrides.${c.name}.keys %]
 
-              [% override = overrides.${col.name}.${match_field}.${row.$match_field} %]
+              [% override = overrides.${c.name}.${match_field}.${row.$match_field} %]
               [% NEXT UNLESS override %]
 
               [% FOREACH key IN override.keys %]
@@ -157,23 +154,23 @@
           <a href="[% basepath FILTER none %][% link_uri %]">
         [% END %]
 
-        [% IF content_use_field && field_descs.exists(row.${col.name}) %]
-           [% colname = row.${col.name} %]
+        [% IF content_use_field && field_descs.exists(row.${c.name}) %]
+           [% colname = row.${c.name} %]
            [% field_descs.${colname} FILTER html %]
         [% ELSIF content %]
             [% content FILTER html_light %]
         [% ELSE %]
           [% IF yesno_field %]
-            [% IF row.${col.name} %]
+            [% IF row.${c.name} %]
               Yes
             [% ELSE %]
               No
             [% END %]
           [% ELSE %]
             [% IF allow_html_content %]
-              [% row.${col.name} FILTER html_light %]
+              [% row.${c.name} FILTER html_light %]
             [% ELSE %]
-              [% row.${col.name} FILTER html %]
+              [% row.${c.name} FILTER html %]
             [% END %]
           [% END %]
         [% END %]
@@ -190,7 +187,6 @@
 [% IF data.size == 0 %]
   <tr><td colspan="[% columns.size %]" align="center"><i>&lt;none&gt;</i></td></tr>
 [% END %]
-  </tbody>
 
 
 [%###################  TABLE FOOTER   ######################%]

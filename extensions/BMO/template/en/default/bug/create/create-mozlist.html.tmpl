@@ -13,7 +13,7 @@
    generate_api_token = 1
    javascript_urls = [ 'extensions/BMO/web/js/form_validate.js',
                        'js/field.js' ]
-   style = ".mandatory{color:var(--required-label-color);font-size:var(--font-size-small);}"
+   style = ".mandatory{color:red;font-size:80%;}"
 %]
 
 <script [% script_nonce FILTER none %]>
@@ -117,8 +117,8 @@
       [% INCLUDE global/textarea.html.tmpl
          name           = 'listLongDesc'
          id             = 'listLongDesc'
-         minrows        = 5
-         maxrows        = 15
+         minrows        = 10
+         maxrows        = 25
          cols           = constants.COMMENT_COLS
          defaultcontent = listLongDesc
        %]
@@ -131,8 +131,8 @@
       [% INCLUDE global/textarea.html.tmpl
          name           = 'comment'
          id             = 'comment'
-         minrows        = 5
-         maxrows        = 15
+         minrows        = 10
+         maxrows        = 25
          cols           = constants.COMMENT_COLS
          defaultcontent = comment
        %]

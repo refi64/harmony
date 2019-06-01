@@ -14,7 +14,7 @@
 }
 #web_bounty_form .required:after {
   content: " *";
-  color: var(--required-label-color);
+  color: red;
 }
 #web_bounty_form .field_label {
   font-weight: bold;
@@ -35,7 +35,12 @@
   margin-bottom: 10px;
 }
 #web_bounty_form textarea {
+  font-family: inherit;
+  font-size: inherit;
   margin: 0 !important;
+}
+#web_bounty_form em {
+  font-size: 1em;
 }
 [% END %]
 

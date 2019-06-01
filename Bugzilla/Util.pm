@@ -654,17 +654,17 @@ sub time_ago {
   my $mo = round($dd / 30);
   my $yy = round($mo / 12);
 
-  return 'Just now'           if $ss < 10;
+  return 'just now'           if $ss < 10;
   return $ss . ' seconds ago' if $ss < 45;
-  return '1 minute ago'       if $ss < 90;
+  return 'a minute ago'       if $ss < 90;
   return $mm . ' minutes ago' if $mm < 45;
-  return 'Last hour'          if $mm < 90;
+  return 'an hour ago'        if $mm < 90;
   return $hh . ' hours ago'   if $hh < 24;
-  return 'Yesterday'          if $hh < 36;
+  return 'a day ago'          if $hh < 36;
   return $dd . ' days ago'    if $dd < 30;
-  return 'Last month'         if $dd < 45;
+  return 'a month ago'        if $dd < 45;
   return $mo . ' months ago'  if $mo < 12;
-  return 'Last year'          if $mo < 18;
+  return 'a year ago'         if $mo < 18;
   return $yy . ' years ago';
 }
 

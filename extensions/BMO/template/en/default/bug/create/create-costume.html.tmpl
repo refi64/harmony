@@ -17,14 +17,23 @@
   margin-bottom: 0.5em;
 }
 
+
 #custom_form th {
   text-align: right;
   font-weight: normal;
   white-space: nowrap;
 }
 
+#custom_form .heading {
+  text-align: left;
+  font-weight: bold;
+  border-top: 2px dotted #969696;
+}
+
 #custom_form input[type="text"], #custom_form textarea {
   width: 300px;
+  font-family: "Fira Sans","Open Sans","Helvetica Neue",Arial,Helvetica,sans-serif;
+  font-size: 1em;
 }
 
 #custom_form input.short {
@@ -37,7 +46,7 @@
 
 .mandatory:after {
   content: " *";
-  color: var(--required-label-color);
+  color: red;
 }
 [% END %]
 

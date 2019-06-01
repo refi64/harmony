@@ -22,17 +22,14 @@
     [% END %]
   </p>
 
-  <table id="report" class="standard">
-  <thead>
-  <tr>
+  <table id="report" class="hover" cellspacing="0" border="0" width="100%">
+  <tr id="report-header">
     <th>Next Attempt After</th>
     <th>Error Count</th>
     <th>Error Time</th>
     <th>Error Message</th>
     <th>Job</th>
   </tr>
-  </thead>
-  <tbody>
   [% FOREACH job IN jobs %]
     <tr class="report item [% loop.count % 2 == 1 ? "report_row_odd" : "report_row_even" %]">
       <td nowrap>
@@ -64,7 +61,6 @@
       <td>[% job.subject || '-' FILTER html %]</td>
     </tr>
   [% END %]
-  </tbody>
   </table>
 
 [% ELSE %]

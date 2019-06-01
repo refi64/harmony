@@ -1,25 +1,19 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- *
- * This Source Code Form is "Incompatible With Secondary Licenses", as
- * defined by the Mozilla Public License, v. 2.0.
- */
+hr {margin: 20px auto 40px}
 
-hr {
-  margin: 20px auto 40px;
-}
+.bz_private { color:darkred }
 
-.bz_private {
-  color: var(--error-message-foreground-color);
+h1 {
+  font-size: 2em;
+  margin-bottom: 10px;
 }
 
 /* bugfields is table of all fields and values */
 .bugfields {
-  border: 1px solid var(--primary-region-border-color);
+  font-size: small;
+  background: #eee;
   padding: 5px;
+  border: 1px solid silver;
   width: 100%;
-  background: var(--primary-region-background-color);
 }
 
 .bugfields tr {
@@ -30,12 +24,12 @@ hr {
   width: 10em;
   text-align: left;
   font-weight: normal;
-  line-height: var(--line-height-comfortable);
+  line-height: 150%;
 }
 
 .bugfields td {
   font-weight: bold;
-  line-height: var(--line-height-comfortable);
+  line-height: 150%;
 }
 
 .bugfields .rightcell {
@@ -43,18 +37,16 @@ hr {
 }
 
 /* set line-height to normal for nested tables of bugfields table */
-.bugfields table th,
-.bugfields table td {
-  width: auto;
+.bugfields table th, .bugfields table td {
   line-height: 100%;
+  width: auto;
 }
 
-.bugfields table.timetracking th,
-.bugfields table.timetracking td {
+.bugfields table.timetracking th, .bugfields table.timetracking td {
   width: 10em;
 }
 
 .error {
-  color: var(--error-message-foreground-color);
+  color: red;
   font-weight: bold;
 }

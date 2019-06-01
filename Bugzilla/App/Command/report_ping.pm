@@ -79,9 +79,9 @@ sub run {
       'Testing',
       sub {
         foreach my $result (@_) {
-          my @error = $report->test_row($result);
+          my @error = $report->test($result);
           if (@error) {
-            my $doc = $report->extract_content($result);
+            my (undef, $doc) = $report->prepare($result);
             die $json->encode({errors => \@error, result => $doc});
           }
         }
@@ -94,8 +94,7 @@ sub run {
       'Dumping',
       sub {
         foreach my $result (@_) {
-          my $doc = $report->extract_content($result);
-          my $id = $result->id;
+          my ($id, $doc) = $report->prepare($result);
           path($working_dir, "$id.json")->spurt($json->encode($doc));
         }
       }
@@ -106,7 +105,7 @@ sub run {
       $report,
       'Sending',
       sub {
-        Mojo::Promise->all(map { $report->send_row($_) } @_)->wait;
+        Mojo::Promise->all(map { $report->send($_) } @_)->wait;
       }
     );
   }

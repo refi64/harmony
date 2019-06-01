@@ -6,11 +6,10 @@
  * defined by the Mozilla Public License, v. 2.0. */
 
 .pcs-message {
-  color: var(--error-message-foreground-color);
-  font-size: var(--font-size-small);
+    color: red;
 }
 
 #prod_comp_search_main {
-  width: 400px;
-  margin: 0 auto;
+    width: 400px;
+    margin: 0 auto;
 }

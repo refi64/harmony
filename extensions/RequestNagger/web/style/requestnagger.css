@@ -6,33 +6,37 @@
  * defined by the Mozilla Public License, v. 2.0. */
 
 .edit_form {
-  width: 100%;
+    width: 100%;
 }
 
 .flag-bug {
-  font-size: var(--font-size-x-large);
+    font-size: large;
 }
 
-.flag-bug,
-.flag-attach,
-.flag-details {
-  margin-bottom: 1em;
+.flag-bug, .flag-attach, .flag-details {
+    margin-bottom: 1em;
 }
 
 .flag-attach-details {
-  font-size: var(--font-size-small);
+    font-size: small;
 }
 
 .flag-attach-actions {
-  font-size: var(--font-size-small);
+    font-size: small;
 }
 
-.flag-attach-desc,
-.flag-type,
-.deferred {
-  font-weight: bold;
+.flag-attach-desc {
+    font-weight: bold;
+}
+
+.flag-type {
+    font-weight: bold;
 }
 
 .defer {
-  margin-bottom: 2em;
+    margin-bottom: 2em;
+}
+
+.deferred {
+    font-weight: bold;
 }

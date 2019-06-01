@@ -12,7 +12,7 @@
   style_urls = [ 'extensions/Push/web/admin.css' ]
 %]
 
-<table id="report" class="standard">
+<table id="report" cellspacing="0">
 
 [% PROCESS show_queue
            queue = push.queue
@@ -34,9 +34,8 @@
 [% INCLUDE global/footer.html.tmpl %]
 
 [% BLOCK show_queue %]
-  <thead>
   [% count = queue.count %]
-  <tr>
+  <tr class="report-header">
     <th colspan="2">
       [% title FILTER html %] Queue ([% count FILTER html %])
     </th>
@@ -48,8 +47,6 @@
       <th colspan="5">&nbsp;</td>
     [% END %]
   </tr>
-  </thead>
-  <tbody>
 
   [% IF count %]
     <tr class="report-subheader">
@@ -102,5 +99,4 @@
   <tr>
     <td colspan="7">&nbsp;</td>
   </tr>
-  </tbody>
 [% END %]

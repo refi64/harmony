@@ -14,18 +14,32 @@
 }
 #automative_form .required:after {
   content: " *";
-  color: var(--required-label-color);
+  color: red;
 }
 #automative_form .field_label {
   font-weight: bold;
 }
 #automative_form .field_desc {
   padding-bottom: 3px;
+}
+#automative_form .field_desc,
+#automative_form .head_desc {
   width: 600px;
   word-wrap: normal;
 }
+#automative_form .head_desc {
+  padding-top: 5px;
+  padding-bottom: 12px;
+}
 #automative_form .form_section {
   margin-bottom: 10px;
+}
+#automative_form textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+#automative_form em {
+  font-size: 1em;
 }
 .yui-calcontainer {
   z-index: 2;
@@ -91,7 +105,9 @@ function validateAndSubmit() {
   <input type="hidden" name="token" value="[% token FILTER html %]">
   <input type="hidden" name="assigned_to" value="jgriffin@mozilla.com">
 
-  <h1>Welcome to the Automation Request Form!</h1>
+  <div class="head_desc">
+    Welcome to the Automation Request Form!
+  </div>
 
   <div class="form_section">
     <label for="short_desc" class="field_label required">Summary</label>

@@ -178,15 +178,12 @@ YAHOO.util.Event.onDOMReady(onRemoveChange);
 
 [% IF watches.size %]
 
-  <table id="remove_table" class="standard">
-  <thead>
-    <tr>
-      <th>&nbsp;</th>
-      <th>Product</th>
-      <th>Component</th>
-    </tr>
-  </thead>
-  <tbody>
+  <table border="0" cellpadding="3" cellspacing="0" id="remove_table">
+  <tr>
+    <td>&nbsp;</td>
+    <td><b>Product</b></td>
+    <td>&nbsp;<b>Component</b></td>
+  </tr>
   [% FOREACH watch IN watches %]
     <tr>
       <td>
@@ -215,7 +212,6 @@ YAHOO.util.Event.onDOMReady(onRemoveChange);
       </td>
     </tr>
   [% END %]
-  </tbody>
   </table>
 
   <input id="remove" type="submit" value="Remove Selected">

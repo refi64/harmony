@@ -14,6 +14,8 @@ use strict;
 use warnings;
 
 use Bugzilla::WebService::Server;
+use Bugzilla::WebService::Wants;
+use PerlX::Maybe qw(maybe);
 
 # Used by the JSON-RPC server to convert incoming date fields apprpriately.
 use constant DATE_FIELDS => {};

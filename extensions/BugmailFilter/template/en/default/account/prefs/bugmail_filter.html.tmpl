@@ -148,8 +148,7 @@ var cpts = new Array();
 
 [% IF filters.size %]
 
-  <table id="filters_table" class="standard">
-  <thead>
+  <table id="filters_table">
     <tr>
       <td></td>
       <th>Product</th>
@@ -159,8 +158,6 @@ var cpts = new Array();
       <th>Changer</th>
       <th>Action</th>
     </tr>
-  </thead>
-  <tbody>
     [% FOREACH filter = filters %]
       <tr class="[% "row_odd" UNLESS loop.count % 2 %]">
         <td>
@@ -187,7 +184,6 @@ var cpts = new Array();
       <td></td>
       <td><input id="remove" name="remove_filter" type="submit" value="Remove Selected"></td>
     </tr>
-  </tbody>
   </table>
 
 [% ELSE %]

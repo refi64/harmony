@@ -31,8 +31,8 @@
   style_urls = ['skins/standard/admin.css']
 %]
 
-<table class="standard">
-  <tr>
+<table border="1" cellpadding="4" cellspacing="0">
+  <tr bgcolor="#6666FF">
     <th valign="top" align="left">Field</th>
     <th valign="top" align="left">Value</th>
   </tr>
@@ -115,13 +115,13 @@
     <td>
       [% IF product.components.size > 0 %]
         <table>
-          [% FOREACH comp = product.components %]
+          [% FOREACH c = product.components %]
             <tr>
-              <th align="right">[% comp.name FILTER html %]:</th>
+              <th align="right">[% c.name FILTER html %]:</th>
               [%# descriptions are intentionally not filtered to allow html content %]
               <td>
-                [% IF comp.description %]
-                  [% comp.description FILTER html_light %]
+                [% IF c.description %]
+                  [% c.description FILTER html_light %]
                 [% ELSE %]
                   <span style="color: red">missing</span>
                 [% END %]

@@ -7,8 +7,7 @@
 # This Source Code Form is "Incompatible With Secondary Licenses", as
 # defined by the Mozilla Public License, v. 2.0.
 #
-# Usage secbugsreport.pl YYYY MM DD HH MM SS +|-ZZZZ
-#  e.g. secbugsreport.pl $(date +'%Y %m %d %H %M %S %z')
+# Usage secbugsreport.pl YYYY MM DD, e.g. secbugsreport.pl $(date +'%Y %m %d')
 
 use 5.10.1;
 use strict;
@@ -33,30 +32,14 @@ use Types::Standard qw(Int);
 BEGIN { Bugzilla->extensions }
 Bugzilla->usage_mode(USAGE_MODE_CMDLINE);
 
-my ($year, $month, $day, $hours, $minutes, $seconds, $time_zone_offset) = @ARGV;
+my ($year, $month, $day) = @ARGV;
 
 exit 0 unless Bugzilla->params->{report_secbugs_active};
-exit 0
-  unless Int->check($year)
-  && Int->check($month)
-  && Int->check($day)
-  && Int->check($hours)
-  && Int->check($minutes)
-  && Int->check($seconds);
+exit 0 unless Int->check($year) && Int->check($month) && Int->check($day);
 
 my $html;
-my $template = Bugzilla->template();
-my $end_date = DateTime->new(
-  year      => $year,
-  month     => $month,
-  day       => $day,
-  hour      => $hours,
-  minute    => $minutes,
-  second    => $seconds,
-  time_zone => $time_zone_offset
-);
-$end_date->set_time_zone('UTC');
-
+my $template     = Bugzilla->template();
+my $end_date     = DateTime->new(year => $year, month => $month, day => $day);
 my $start_date   = $end_date->clone()->subtract(months => 12);
 my $report_week  = $end_date->ymd('-');
 my $teams        = decode_json(Bugzilla->params->{report_secbugs_teams});
@@ -111,7 +94,7 @@ my @parts = (
         encoding     => 'base64',
       },
       body => $report->graphs->{$_}->slurp,
-    )
+      )
   } sort { $a cmp $b } keys %{$report->graphs}
 );
 

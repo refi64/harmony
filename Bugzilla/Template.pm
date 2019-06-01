@@ -234,6 +234,9 @@ sub quoteUrls {
                ("\x{FDD2}" . ($count-1) . "\x{FDD3}")
               ~egmxi;
 
+  # Current bug ID this comment belongs to
+  my $current_bugurl = $bug ? ("show_bug.cgi?id=" . $bug->id) : "";
+
   # This handles bug a, comment b type stuff. Because we're using /g
   # we have to do this in one pattern, and so this is semi-messy.
   # Also, we can't use $bug_re?$comment_re? because that will match the
@@ -245,7 +248,7 @@ sub quoteUrls {
               ~ # We have several choices. $1 here is the link, and $2-4 are set
                 # depending on which part matched
                (defined($2) ? $bug_link_func->($2, $1, { comment_num => $3, user => $user }) :
-                $bug ? $bug_link_func->($bug->id, $1, { comment_num => $4, user => $user }) : $1)
+                              "<a href=\"$current_bugurl#c$4\">$1</a>")
               ~egx;
 
   # Old duplicate markers. These don't use $bug_word because they are old
@@ -1091,8 +1094,9 @@ sub create {
         return '' unless @sigs;
 
         # use a URI object to encode the query string part.
-        my $uri = URI->new(Bugzilla->localconfig->{urlbase} . 'page.cgi');
-        $uri->query_form({'id' => 'socorro-lens.html', 's' => join("\\", @sigs)});
+        my $uri = URI->new(
+          Bugzilla->localconfig->{urlbase} . 'metricsgraphics/socorro-lens.html');
+        $uri->query_form('s' => join("\\", @sigs));
         return $uri;
       },
     },

@@ -37,6 +37,7 @@
     "extensions/ProdCompSearch/web/styles/prod_comp_search.css",
   ];
   javascript_urls = [
+    "extensions/BMO/web/js/new-bug-frequent-comp.js",
     "extensions/ProdCompSearch/web/js/prod_comp_search.js",
   ];
 
@@ -47,15 +48,15 @@
     generate_api_token = 1;
 %]
 
-[% IF NOT is_describe %]
-<p id="top-help">
+<div id="choose_product">
+
+<hr>
+<p>
   Looking for technical support or help getting your site to work with Mozilla?
   <a href="https://support.mozilla.org/">Visit the mozilla.org support page</a>
   before filing [% terms.bugs %].
 </p>
-[% END %]
-
-<section id="choose_product">
+<hr>
 
 <h2>[% h2 FILTER html %]</h2>
 
@@ -156,15 +157,15 @@
 [% ELSE %]
 
   <table>
-    [% FOREACH cls = classifications %]
-      [% IF cls.object %]
+    [% FOREACH c = classifications %]
+      [% IF c.object %]
         <tr>
-          <td align="right"><h2>[% cls.object.name FILTER html %]</h2></td>
-          <td><strong>[%+ cls.object.description FILTER html_light %]</strong></td>
+          <td align="right"><h2>[% c.object.name FILTER html %]</h2></td>
+          <td><strong>[%+ c.object.description FILTER html_light %]</strong></td>
         </tr>
       [% END %]
 
-      [% FOREACH p = cls.products %]
+      [% FOREACH p = c.products %]
         [% class = "" %]
         [% has_entry_groups = 0 %]
         [% FOREACH gid = p.group_controls.keys %]
@@ -200,7 +201,7 @@
 [% END %]
 
 </section>
-</section>
+</div>
 
 [% IF NOT is_describe %]
 <div id="guided">
@@ -218,8 +219,8 @@
 [%###########################################################################%]
 
 [% BLOCK easyproduct %]
-  [% FOREACH cls = classifications %]
-    [% FOREACH p = cls.products %]
+  [% FOREACH c = classifications %]
+    [% FOREACH p = c.products %]
       [% IF p.name == name %]
         <section class="product major">
           <h3>

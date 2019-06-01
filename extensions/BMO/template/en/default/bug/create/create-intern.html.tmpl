@@ -23,15 +23,21 @@
 [% PROCESS global/variables.none.tmpl %]
 
 [% inline_style = BLOCK %]
+#heading {
+  width:       98%;
+  font-size:   2em;
+  font-weight: bold;
+  margin:      10px;
+}
 p {
   max-width: 40%;
 }
 label.required:before {
   content: "* ";
-  color: var(--required-label-color);
+  color: red;
 }
 .required_star {
-  color: var(--required-label-color);
+  color: red;
 }
 .row label {
   display: block;
@@ -88,7 +94,7 @@ $(document).ready(function() {
   [% RETURN %]
 [% END %]
 
-<h1>Intern Requests</h1>
+<div id="heading">Intern Requests</div>
 <div>
   <p>
     Applications for 2016 Interns are now being accepted. If you would

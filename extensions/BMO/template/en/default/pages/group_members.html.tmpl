@@ -43,9 +43,8 @@
   </p>
 
   [% IF types.size > 0 %]
-    <table id="report" class="standard">
-    <thead>
-      <tr>
+    <table border="0" cellspacing="0" id="report" class="nohover" width="100%">
+      <tr id="report-header">
         <th>Type</th>
         <th>Count</th>
         <th>Members</th>
@@ -53,8 +52,7 @@
           <th class="right">2FA, Last Seen (days ago)</th>
         [% END %]
       </tr>
-    </thead>
-    <tbody>
+
       [% FOREACH type = types %]
         [% count = loop.count() %]
         <tr class="report_item [% count % 2 == 1 ? "report_row_odd" : "report_row_even" %]">
@@ -111,7 +109,6 @@
           </td>
         </tr>
       [% END %]
-    </tbody>
     </table>
 
     <a href="[% basepath FILTER none %]page.cgi?id=group_members.json&amp;group=[% group.name FILTER uri %]
