@@ -262,12 +262,7 @@ our @always_fileable_groups = qw(
 );
 
 # Automatically CC users to bugs filed into configured groups and products
-our %group_auto_cc = (
-  'partner-confidential' => {
-    'Marketing' => ['jbalaco@mozilla.com'],
-    '_default'  => ['mbest@mozilla.com'],
-  },
-);
+our %group_auto_cc = ();
 
 # Force create-bug template by product
 # Users in 'include' group will be forced into using the form.
