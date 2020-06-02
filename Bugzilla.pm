@@ -486,6 +486,22 @@ sub _json_server {
   return request_cache->{_json_server};
 }
 
+sub usage_mode_str {
+  my ($class, $val) = @_;
+  state $map = {
+    undef => 'default',
+    (USAGE_MODE_BROWSER) => 'browser',
+    (USAGE_MODE_CMDLINE) => 'cmdline',
+    (USAGE_MODE_XMLRPC)  => 'xmlrpc',
+    (USAGE_MODE_EMAIL)   => 'email',
+    (USAGE_MODE_JSON)    => 'json',
+    (USAGE_MODE_TEST)    => 'test',
+    (USAGE_MODE_REST)    => 'rest',
+    (USAGE_MODE_MOJO)    => 'mojo',
+  };
+  return $map->{$val // 'undef'};
+}
+
 sub usage_mode {
   my ($class, $newval) = @_;
   if (defined $newval) {
