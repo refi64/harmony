@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@master
-      - name: Generate the artifacts
-        uses: skx/github-action-build@master
+        uses: actions/checkout@v2
+      - name: cpm install
+        run: '$GITHUB_WORKSPACE/.github/build'
       # - name: Upload the artifacts
       #   uses: skx/github-action-publish-binaries@master
       #   env:
