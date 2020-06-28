@@ -985,7 +985,7 @@ sub create {
       'sudoer' => sub { return Bugzilla->sudoer; },
 
       # Allow templates to access the "correct" URLBase value
-      'urlbase' => sub { return Bugzilla->localconfig->urlbase; },
+      'urlbase' => sub { Bugzilla->urlbase },
 
       # Allow templates to get the absolute path of the URLBase value
       'basepath' => sub { return Bugzilla->localconfig->basepath; },
@@ -1057,6 +1057,8 @@ sub create {
       },
 
       'feature_enabled' => sub { return Bugzilla->feature(@_); },
+
+      'has_extension' => sub { return Bugzilla->has_extension(@_); },
 
       # field_descs can be somewhat slow to generate, so we generate
       # it only once per-language no matter how many times
