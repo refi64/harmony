@@ -1,0 +1,6 @@
+#!/bin/sh
+
+curl -so cpanm https://cpanmin.us
+chmod 755 cpanm
+
+./cpanm --notest -Lcpm App::cpm Carton::Snapshot
