@@ -30,9 +30,8 @@ jobs:
             ${{ runner.os }}-build
       - name: cpm install
         run: '$GITHUB_WORKSPACE/.github/build'
-      # - name: Upload the artifacts
-      #   uses: skx/github-action-publish-binaries@master
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     args: 'example-*'
+      - name: Save dependencies
+        uses: actions/upload-artifact@v2
+        with:
+          name: local
+          path: local/
