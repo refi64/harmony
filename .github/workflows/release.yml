@@ -33,5 +33,5 @@ jobs:
       - name: Save dependencies
         uses: actions/upload-artifact@v2
         with:
-          name: local
-          path: local/
+          name: local-lib.tar.gz
+          path: local-lib.tar.gz
