@@ -1,6 +1,3 @@
 #!/bin/sh
 
-curl -so cpanm https://cpanmin.us
-chmod 755 cpanm
-
-./cpanm --notest -Lcpm App::cpm Carton::Snapshot
+perl -I$GITHUB_WORKSPACE/.github/cpm/lib/perl5 $GITHUB_WORKSPACE/.github/cpm/bin/cpm install
