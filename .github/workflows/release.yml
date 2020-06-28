@@ -18,6 +18,16 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v2
+      - name: Cache CPAN packages
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.perl-cpm/cache
+            ~/.perl-cpm/builds
+            **/local/
+          key: ${{ runner.os }}-build
+        restore-keys: |
+          ${{ runner.os }}-build
       - name: cpm install
         run: '$GITHUB_WORKSPACE/.github/build'
       # - name: Upload the artifacts
