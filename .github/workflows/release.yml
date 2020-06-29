@@ -12,9 +12,9 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  generate:
-    name: Create release-artifacts
-    runs-on: ubuntu-latest
+  ubuntu:
+    name: Release Files for Ubuntu 20.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v2
@@ -25,13 +25,23 @@ jobs:
             ~/.perl-cpm/cache
             ~/.perl-cpm/builds
             **/local/
-          key: ${{ runner.os }}-build
+          key: ${{ runner.os }}-ubuntu-20.04
           restore-keys: |
-            ${{ runner.os }}-build
+            ${{ runner.os }}-ubuntu-20.04
       - name: cpm install
-        run: '$GITHUB_WORKSPACE/.github/build'
+        run: |
+          sudo apt-get install -y \
+              build-essential curl libssl-dev zlib1g-dev openssl \
+              libexpat-dev cmake git libcairo-dev libgd-dev \
+              default-libmysqlclient-dev unzip wget \
+          && perl -I$GITHUB_WORKSPACE/.github/cpm/lib/perl5 $GITHUB_WORKSPACE/.github/cpm/bin/cpm install \
+          && tar -C $GITHUB_WORKSPACE \
+              --exclude 'local/cache/*' \
+              --exclude 'local/man/*' \
+              --exclude '*.pod' \
+              -zcvf local-lib.tar.gz local
       - name: Save dependencies
         uses: actions/upload-artifact@v2
         with:
-          name: local-lib.tar.gz
+          name: ubuntu-20.04-local-lib.tar.gz
           path: local-lib.tar.gz
