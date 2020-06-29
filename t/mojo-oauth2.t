@@ -16,6 +16,7 @@ BEGIN {
   $ENV{BUGZILLA_ALLOW_INSECURE_HTTP} = 1;
 }
 
+use CGI::Compile;
 use Bugzilla::Test::MockDB;
 use Bugzilla::Test::MockParams (password_complexity => 'no_constraints');
 use Bugzilla::Test::Util qw(create_user create_oauth_client);
