@@ -5,4 +5,8 @@ sudo apt-get install -y \
     libexpat-dev cmake git libcairo-dev libgd-dev \
     default-libmysqlclient-dev unzip wget \
 && perl -I$GITHUB_WORKSPACE/.github/cpm/lib/perl5 $GITHUB_WORKSPACE/.github/cpm/bin/cpm install \
-&& tar -C $GITHUB_WORKSPACE -zcvf local-lib.tar.gz local
+&& tar -C $GITHUB_WORKSPACE \
+    --exclude 'local/cache/*' \
+    --exclude 'local/man/*' \
+    --exclude '*.pod' \
+    -zcvf local-lib.tar.gz local
