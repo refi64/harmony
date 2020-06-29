@@ -45,3 +45,5 @@ jobs:
         with:
           name: ubuntu-20.04-local-lib.tar.gz
           path: local-lib.tar.gz
+      - name: Run tests
+        run: 'prove -Ilocal/lib/perl5 t'
